@@ -145,6 +145,25 @@ Remaining gap: the generic Remix v2 script path still creates commentary from
 `CombatCommentaryGenerator` directly from ranked highlights so voiceover text,
 subtitle timing, and visual hook time share the same evidence packet.
 
+The `combat-cut` command now supports this combat-specific path:
+
+```powershell
+python -m src.main combat-cut `
+  --input .\data\downloads\fight.mp4 `
+  --transcript .\data\transcripts\fight.json `
+  --top 10 `
+  --write-commentary
+```
+
+For each exported clip it writes:
+
+- `*.commentary.json`: highlight, commentary segment, and evidence timeline,
+- `*.ass`: burn-in subtitle file using the configured subtitle style.
+
+This is the first practical bridge between visual highlight timing and the
+voiceover/subtitle layer. The next step is to optionally generate TTS audio per
+clip and mux it into the exported highlight.
+
 ## Recommended Prompt Rules
 
 Use a strict system prompt for professional commentary:

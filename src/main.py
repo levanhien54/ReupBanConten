@@ -195,6 +195,7 @@ def download(url: str, folder: Optional[str]) -> None:
 @click.option("--index-id", help="Twelve Labs index id/name for semantic combat search")
 @click.option("--api-query", help="Semantic query for combat highlights")
 @click.option("--api-limit", default=20, show_default=True, help="Maximum semantic API matches")
+@click.option("--write-commentary", is_flag=True, help="Write evidence-based commentary JSON and ASS subtitles")
 @click.option("--dry-run", is_flag=True, help="Rank highlights without exporting clips")
 def combat_cut(
     input_path: str,
@@ -208,6 +209,7 @@ def combat_cut(
     index_id: Optional[str],
     api_query: Optional[str],
     api_limit: int,
+    write_commentary: bool,
     dry_run: bool,
 ) -> None:
     """Rank and cut hook-focused combat-sports highlights."""
@@ -266,6 +268,14 @@ def combat_cut(
     clipper = SmartClipper(config.cutter)
     clip_repo = ClipRepository(get_database())
     destination = output_dir or os.path.join(config.storage.clips, "combat")
+    commentary_script = None
+    if write_commentary:
+        commentary_script = asyncio.run(
+            _build_combat_commentary(
+                highlights=highlights,
+                transcript=transcript,
+            )
+        )
     exported = 0
     for idx, highlight in enumerate(highlights, start=1):
         clip = clipper.export_clip(
@@ -290,6 +300,14 @@ def combat_cut(
             source_folder="combat",
         )
         exported += 1
+        if commentary_script:
+            _write_combat_commentary_assets(
+                config=config,
+                clip_path=clip.file_path,
+                highlight=highlight,
+                commentary_segment=commentary_script.segments[idx - 1],
+                transcript=transcript,
+            )
         click.echo(f"  Exported clip #{clip_id}: {clip.file_path}")
 
     click.secho(f"Exported {exported} combat highlight clips to {destination}", fg="green")
@@ -686,6 +704,51 @@ def _search_combat_api(
     except Exception as exc:
         click.secho(f"Semantic API search failed; continuing locally: {exc}", fg="yellow")
         return []
+
+
+async def _build_combat_commentary(*, highlights, transcript):
+    from src.remixer.combat_commentary import CombatCommentaryGenerator
+
+    generator = CombatCommentaryGenerator()
+    return await generator.generate_script(
+        highlights,
+        transcript=transcript,
+        sport="combat",
+    )
+
+
+def _write_combat_commentary_assets(
+    *,
+    config: AppConfig,
+    clip_path: str,
+    highlight,
+    commentary_segment,
+    transcript,
+) -> None:
+    from src.core.types import CommentaryScript
+    from src.remixer.ass_generator import ASSGenerator
+    from src.remixer.combat_commentary import build_evidence_packet
+
+    base_path = os.path.splitext(clip_path)[0]
+    packet = build_evidence_packet(highlight, transcript=transcript, sport="combat")
+    payload = {
+        "clip_path": clip_path,
+        "highlight": highlight.model_dump(),
+        "commentary": commentary_segment.model_dump(),
+        "evidence": packet.__dict__,
+    }
+    json_path = base_path + ".commentary.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    ass_path = base_path + ".ass"
+    ASSGenerator(config.remixer.effects.subtitles).generate(
+        CommentaryScript(segments=[commentary_segment]),
+        ass_path,
+        width=1080,
+        height=1920,
+    )
+    click.echo(f"  Commentary assets: {json_path}, {ass_path}")
 
 
 def _highlight_tags(highlight) -> set[str]:
