@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from src.core.config import AppConfig
 from src.ui.combat_command import build_combat_cut_command
+from src.ui.combat_results import format_combat_output_summary, load_combat_output_summaries
 from src.ui.utils import Worker
 from src.remixer.language_registry import language_code_from_label, language_label, supported_language_labels
 
@@ -174,8 +175,10 @@ class CombatStudioPage(QWidget):
         return output
 
     def _on_done(self, output: str) -> None:
-        self.txt_output.setText(output)
         out_dir = self.txt_output_dir.text().strip()
+        summaries = load_combat_output_summaries(out_dir)
+        summary_text = format_combat_output_summary(summaries)
+        self.txt_output.setText(output + "\n\nOutput Audit:\n" + summary_text)
         if os.name == "nt" and os.path.isdir(out_dir):
             try:
                 os.startfile(out_dir)
