@@ -9,6 +9,8 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import sys
 
 import click
@@ -26,6 +28,8 @@ def _configure_console_encoding() -> None:
     """Make Click help output safe on Windows consoles with legacy code pages."""
     for stream in (sys.stdout, sys.stderr):
         if stream and hasattr(stream, "reconfigure"):
+            if stream.__class__.__module__.startswith("click."):
+                continue
             try:
                 stream.reconfigure(encoding="utf-8")
             except Exception:
@@ -177,6 +181,100 @@ def download(url: str, folder: Optional[str]) -> None:
         click.echo(f"   Path: {video.file_path}")
     else:
         click.secho("âŒ Download failed", fg="red")
+
+
+@cli.command("combat-cut")
+@click.option("--input", "-i", "input_path", required=True, help="Video input path")
+@click.option("--video-id", "-v", help="Stable video id for output names and DB rows")
+@click.option("--transcript", "-t", "transcript_path", help="Transcript JSON cache path")
+@click.option("--top", default=10, show_default=True, help="Number of highlights to export")
+@click.option("--output-dir", "-o", help="Output directory for combat highlight clips")
+@click.option("--run-whisper", is_flag=True, help="Run Whisper if transcript cache is missing")
+@click.option("--transcript-only", is_flag=True, help="Only use transcript signals")
+@click.option("--dry-run", is_flag=True, help="Rank highlights without exporting clips")
+def combat_cut(
+    input_path: str,
+    video_id: Optional[str],
+    transcript_path: Optional[str],
+    top: int,
+    output_dir: Optional[str],
+    run_whisper: bool,
+    transcript_only: bool,
+    dry_run: bool,
+) -> None:
+    """Rank and cut hook-focused combat-sports highlights."""
+    config = _bootstrap()
+    if not os.path.exists(input_path):
+        click.secho(f"Input file not found: {input_path}", fg="red")
+        return
+
+    from src.analyzer.combat_sports import CombatSportsAnalyzer
+    from src.core.database import ClipRepository
+    from src.cutter.smart_clipper import SmartClipper
+
+    resolved_video_id = video_id or _safe_video_id(input_path)
+    transcript = _load_transcript_for_combat_cut(
+        config=config,
+        input_path=input_path,
+        video_id=resolved_video_id,
+        transcript_path=transcript_path,
+        run_whisper=run_whisper,
+    )
+
+    analyzer = CombatSportsAnalyzer(config.combat_sports)
+    highlights = analyzer.analyze(
+        video_path=None if transcript_only else input_path,
+        transcript=transcript,
+        top_k=top,
+    )
+    if not highlights:
+        click.secho("No combat highlights passed the score threshold.", fg="yellow")
+        return
+
+    click.echo(f"Found {len(highlights)} combat highlights:")
+    for idx, highlight in enumerate(highlights, start=1):
+        click.echo(
+            f"  {idx:02d}. score={highlight.score:.2f} "
+            f"{highlight.start_time:.2f}s-{highlight.end_time:.2f}s "
+            f"hook={highlight.hook_time:.2f}s "
+            f"reasons={', '.join(highlight.reasons[:3])}"
+        )
+
+    if dry_run:
+        return
+
+    clipper = SmartClipper(config.cutter)
+    clip_repo = ClipRepository(get_database())
+    destination = output_dir or os.path.join(config.storage.clips, "combat")
+    exported = 0
+    for idx, highlight in enumerate(highlights, start=1):
+        clip = clipper.export_clip(
+            video_id=f"{resolved_video_id}_combat_{idx:02d}",
+            video_path=input_path,
+            start_time=highlight.start_time,
+            end_time=highlight.end_time,
+            output_dir=destination,
+        )
+        clip_id = clip_repo.insert(
+            video_id=resolved_video_id,
+            file_path=clip.file_path,
+            start_time=clip.start_time,
+            end_time=clip.end_time,
+            duration=clip.duration,
+            tags_json=json.dumps(["combat", *sorted(_highlight_tags(highlight))], ensure_ascii=False),
+            mood="exciting",
+            energy_level="high" if highlight.score < 0.9 else "peak",
+            content_type="action",
+            highlight_score=highlight.score,
+            transcript_segment="; ".join(highlight.reasons),
+            source_folder="combat",
+        )
+        exported += 1
+        click.echo(f"  Exported clip #{clip_id}: {clip.file_path}")
+
+    click.secho(f"Exported {exported} combat highlight clips to {destination}", fg="green")
+
+
 @cli.command()
 @click.option("--video-id", "-v", required=True, help="ID video trong database")
 @click.option("--index", is_flag=True, default=True, help="Äáº©y video lĂªn Twelve Labs Index")
@@ -354,6 +452,54 @@ def _check_dependencies() -> dict[str, bool]:
             deps[pkg] = False
 
     return deps
+
+
+def _safe_video_id(input_path: str) -> str:
+    """Create a DB/output-safe id from a local filename."""
+    stem = os.path.splitext(os.path.basename(input_path))[0]
+    safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in stem)
+    return safe[:80] or "combat_video"
+
+
+def _load_transcript_for_combat_cut(
+    *,
+    config: AppConfig,
+    input_path: str,
+    video_id: str,
+    transcript_path: Optional[str],
+    run_whisper: bool,
+):
+    """Load transcript JSON, optionally generating it via Whisper."""
+    from src.core.types import TranscriptResult
+
+    candidates = []
+    if transcript_path:
+        candidates.append(transcript_path)
+    candidates.append(os.path.join(config.storage.transcripts, f"{video_id}.json"))
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as f:
+                return TranscriptResult.model_validate_json(f.read())
+
+    if not run_whisper:
+        return None
+
+    from src.analyzer.transcriber import Transcriber
+
+    transcriber = Transcriber(config.analyzer.whisper, output_dir=config.storage.transcripts)
+    return transcriber.transcribe_with_cache(input_path, video_id)
+
+
+def _highlight_tags(highlight) -> set[str]:
+    tags = set()
+    for signal in highlight.signals:
+        tags.add(signal.kind)
+    for reason in highlight.reasons:
+        tag = reason.split(":", 1)[0].strip()
+        if tag:
+            tags.add(tag)
+    return tags
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
