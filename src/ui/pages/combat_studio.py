@@ -52,6 +52,16 @@ class CombatStudioPage(QWidget):
         self.btn_run.clicked.connect(self._on_run)
         root.addWidget(self.btn_run)
 
+        audit_row = QHBoxLayout()
+        self.btn_refresh_audit = QPushButton("Refresh Output Audit")
+        self.btn_refresh_audit.clicked.connect(self._refresh_audit)
+        self.btn_open_output = QPushButton("Open Output Folder")
+        self.btn_open_output.clicked.connect(self._open_output_dir)
+        audit_row.addWidget(self.btn_refresh_audit)
+        audit_row.addWidget(self.btn_open_output)
+        audit_row.addStretch(1)
+        root.addLayout(audit_row)
+
         self.txt_output = QTextEdit()
         self.txt_output.setReadOnly(True)
         self.txt_output.setStyleSheet(
@@ -175,10 +185,17 @@ class CombatStudioPage(QWidget):
         return output
 
     def _on_done(self, output: str) -> None:
+        self.txt_output.setText(output + "\n\nOutput Audit:\n" + self._load_audit_text())
+
+    def _refresh_audit(self) -> None:
+        self.txt_output.setText("Output Audit:\n" + self._load_audit_text())
+
+    def _load_audit_text(self) -> str:
         out_dir = self.txt_output_dir.text().strip()
-        summaries = load_combat_output_summaries(out_dir)
-        summary_text = format_combat_output_summary(summaries)
-        self.txt_output.setText(output + "\n\nOutput Audit:\n" + summary_text)
+        return format_combat_output_summary(load_combat_output_summaries(out_dir))
+
+    def _open_output_dir(self) -> None:
+        out_dir = self.txt_output_dir.text().strip()
         if os.name == "nt" and os.path.isdir(out_dir):
             try:
                 os.startfile(out_dir)

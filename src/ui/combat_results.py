@@ -9,6 +9,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class CombatOutputSummary:
     json_path: str
+    clip_path: str
     final_video_path: str
     score: float
     ready: bool
@@ -17,6 +18,10 @@ class CombatOutputSummary:
     has_audio: bool
     duration: float
     language: str
+    start_time: float
+    end_time: float
+    hook_time: float
+    commentary_text: str
 
 
 def load_combat_output_summaries(output_dir: str) -> list[CombatOutputSummary]:
@@ -35,9 +40,11 @@ def load_combat_output_summaries(output_dir: str) -> list[CombatOutputSummary]:
 
         probe = payload.get("final_video_probe") or {}
         highlight = payload.get("highlight") or {}
+        commentary = payload.get("commentary") or {}
         summaries.append(
             CombatOutputSummary(
                 json_path=path,
+                clip_path=str(payload.get("clip_path") or ""),
                 final_video_path=payload.get("final_video_path") or "",
                 score=float(highlight.get("score") or 0.0),
                 ready=bool(payload.get("final_video_ready")),
@@ -46,9 +53,20 @@ def load_combat_output_summaries(output_dir: str) -> list[CombatOutputSummary]:
                 has_audio=bool(probe.get("has_audio")),
                 duration=float(probe.get("duration") or 0.0),
                 language=str(payload.get("language") or ""),
+                start_time=float(highlight.get("start_time") or 0.0),
+                end_time=float(highlight.get("end_time") or 0.0),
+                hook_time=float(highlight.get("hook_time") or 0.0),
+                commentary_text=str(commentary.get("text") or ""),
             )
         )
     return summaries
+
+
+def _shorten(text: str, limit: int = 90) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."
 
 
 def format_combat_output_summary(summaries: list[CombatOutputSummary]) -> str:
@@ -64,6 +82,8 @@ def format_combat_output_summary(summaries: list[CombatOutputSummary]) -> str:
         lines.append(
             f"{idx:02d}. {status} score={item.score:.2f} "
             f"{item.width}x{item.height} {audio} {item.duration:.2f}s "
-            f"lang={item.language} file={final_name}"
+            f"lang={item.language} hook={item.hook_time:.2f}s file={final_name}"
         )
+        if item.commentary_text:
+            lines.append(f"    commentary: {_shorten(item.commentary_text)}")
     return "\n".join(lines)
