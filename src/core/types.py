@@ -261,7 +261,7 @@ class Clip(BaseModel):
 
 class RemixStep(BaseModel):
     """1 bước trong kịch bản remix."""
-    clip_id: Optional[int] = None
+    clip_id: Optional[str | int] = None
     folder: Optional[str] = None
     segment: Optional[str] = None
     transition_in: TransitionType = TransitionType.CROSSFADE

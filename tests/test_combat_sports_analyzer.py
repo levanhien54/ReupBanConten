@@ -62,6 +62,27 @@ def test_nearby_signals_merge_with_diversity_bonus():
     assert len(highlights[0].signals) == 3
 
 
+def test_api_results_are_ranked_as_semantic_signals():
+    analyzer = CombatSportsAnalyzer(_config())
+
+    highlights = analyzer.analyze(
+        api_results=[
+            {
+                "start": 12.0,
+                "end": 15.0,
+                "confidence": 0.91,
+                "reason": "clean knockdown and crowd reaction",
+            }
+        ]
+    )
+
+    assert len(highlights) == 1
+    assert highlights[0].score >= 0.72
+    assert highlights[0].hook_time == 13.5
+    assert any(signal.kind == "api_semantic" for signal in highlights[0].signals)
+    assert any("api_semantic" in reason for reason in highlights[0].reasons)
+
+
 def test_low_score_signals_are_filtered():
     analyzer = CombatSportsAnalyzer(_config(threshold=0.72))
     signals = [
@@ -71,4 +92,3 @@ def test_low_score_signals_are_filtered():
     highlights = analyzer.rank_signals(signals)
 
     assert highlights == []
-

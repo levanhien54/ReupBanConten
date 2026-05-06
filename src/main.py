@@ -191,6 +191,10 @@ def download(url: str, folder: Optional[str]) -> None:
 @click.option("--output-dir", "-o", help="Output directory for combat highlight clips")
 @click.option("--run-whisper", is_flag=True, help="Run Whisper if transcript cache is missing")
 @click.option("--transcript-only", is_flag=True, help="Only use transcript signals")
+@click.option("--use-api", is_flag=True, help="Merge Twelve Labs semantic matches into ranking")
+@click.option("--index-id", help="Twelve Labs index id/name for semantic combat search")
+@click.option("--api-query", help="Semantic query for combat highlights")
+@click.option("--api-limit", default=20, show_default=True, help="Maximum semantic API matches")
 @click.option("--dry-run", is_flag=True, help="Rank highlights without exporting clips")
 def combat_cut(
     input_path: str,
@@ -200,6 +204,10 @@ def combat_cut(
     output_dir: Optional[str],
     run_whisper: bool,
     transcript_only: bool,
+    use_api: bool,
+    index_id: Optional[str],
+    api_query: Optional[str],
+    api_limit: int,
     dry_run: bool,
 ) -> None:
     """Rank and cut hook-focused combat-sports highlights."""
@@ -222,9 +230,21 @@ def combat_cut(
     )
 
     analyzer = CombatSportsAnalyzer(config.combat_sports)
+    api_results = []
+    if use_api:
+        api_results = _search_combat_api(
+            analyzer=analyzer,
+            config=config,
+            index_id=index_id,
+            query=api_query,
+            limit=api_limit,
+        )
+        click.echo(f"API semantic matches: {len(api_results)}")
+
     highlights = analyzer.analyze(
         video_path=None if transcript_only else input_path,
         transcript=transcript,
+        api_results=api_results,
         top_k=top,
     )
     if not highlights:
@@ -273,6 +293,67 @@ def combat_cut(
         click.echo(f"  Exported clip #{clip_id}: {clip.file_path}")
 
     click.secho(f"Exported {exported} combat highlight clips to {destination}", fg="green")
+
+
+@cli.command("combat-index")
+@click.option("--input", "-i", "input_path", required=True, help="Video input path")
+@click.option("--index-id", help="Twelve Labs index id/name to upload into")
+def combat_index(input_path: str, index_id: Optional[str]) -> None:
+    """Upload a combat-sports video into the semantic video index."""
+    config = _bootstrap()
+    if not os.path.exists(input_path):
+        click.secho(f"Input file not found: {input_path}", fg="red")
+        return
+
+    from src.analyzer.twelve_labs_client import TwelveLabsClient
+
+    tl_client = TwelveLabsClient()
+    if not tl_client.is_available():
+        click.secho("Twelve Labs is unavailable. Set TWELVELABS_API_KEY and install twelvelabs.", fg="yellow")
+        return
+
+    resolved_index_id = index_id or config.analyzer.twelve_labs.index_name
+    try:
+        video_api_id = asyncio.run(tl_client.upload_video(resolved_index_id, input_path))
+    except Exception as exc:
+        click.secho(f"Combat index upload failed: {exc}", fg="red")
+        return
+
+    click.secho(f"Indexed video. Twelve Labs video_id: {video_api_id}", fg="green")
+
+
+@cli.command("combat-search-api")
+@click.option("--index-id", help="Twelve Labs index id/name to search")
+@click.option("--query", "-q", help="Semantic query for combat highlights")
+@click.option("--limit", default=20, show_default=True, help="Maximum results")
+def combat_search_api(index_id: Optional[str], query: Optional[str], limit: int) -> None:
+    """Search the semantic video API for combat-sports highlight moments."""
+    config = _bootstrap()
+    from src.analyzer.combat_sports import CombatSportsAnalyzer
+
+    analyzer = CombatSportsAnalyzer(config.combat_sports)
+    results = _search_combat_api(
+        analyzer=analyzer,
+        config=config,
+        index_id=index_id,
+        query=query,
+        limit=limit,
+    )
+
+    if not results:
+        click.secho("No semantic API matches found.", fg="yellow")
+        return
+
+    click.echo(f"Found {len(results)} semantic API matches:")
+    for idx, result in enumerate(results, start=1):
+        start = float(result.get("start", 0.0) or 0.0)
+        end = float(result.get("end", start) or start)
+        confidence = result.get("confidence", result.get("score", 0.0))
+        video_api_id = result.get("video_id", "")
+        click.echo(
+            f"  {idx:02d}. confidence={float(confidence or 0.0):.2f} "
+            f"{start:.2f}s-{end:.2f}s video_id={video_api_id}"
+        )
 
 
 @cli.command()
@@ -489,6 +570,40 @@ def _load_transcript_for_combat_cut(
 
     transcriber = Transcriber(config.analyzer.whisper, output_dir=config.storage.transcripts)
     return transcriber.transcribe_with_cache(input_path, video_id)
+
+
+def _search_combat_api(
+    *,
+    analyzer,
+    config: AppConfig,
+    index_id: Optional[str],
+    query: Optional[str],
+    limit: int,
+) -> list[dict]:
+    from src.analyzer.twelve_labs_client import TwelveLabsClient
+
+    tl_client = TwelveLabsClient()
+    if not tl_client.is_available():
+        click.secho("Twelve Labs is unavailable; continuing with local signals only.", fg="yellow")
+        return []
+
+    resolved_index_id = index_id or config.analyzer.twelve_labs.index_name
+    if not resolved_index_id:
+        click.secho("Missing Twelve Labs index id/name; continuing with local signals only.", fg="yellow")
+        return []
+
+    try:
+        return asyncio.run(
+            analyzer.search_api(
+                tl_client,
+                resolved_index_id,
+                query=query,
+                limit=max(1, limit),
+            )
+        )
+    except Exception as exc:
+        click.secho(f"Semantic API search failed; continuing locally: {exc}", fg="yellow")
+        return []
 
 
 def _highlight_tags(highlight) -> set[str]:

@@ -101,13 +101,13 @@ class ClipSelector:
                 metadata = selected_clip.get("metadata") or {}
                 selected_id = (
                     metadata.get("clip_id")
-                    or metadata.get("id")
                     or selected_clip.get("clip_id")
                     or selected_clip.get("id")
+                    or metadata.get("id")
                     or selected_clip.get("video_id")
                 )
                 if selected_id is not None:
-                    step.clip_id = int(selected_id) if str(selected_id).isdigit() else selected_id
+                    step.clip_id = selected_id
 
                 # --- UNICITY UPGRADE: Temporal Jitter & Visual Params ---
                 if "start" in selected_clip:

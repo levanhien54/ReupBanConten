@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 import os
 import re
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
@@ -136,6 +135,7 @@ class CombatSportsAnalyzer:
         self,
         video_path: Optional[str] = None,
         transcript: Optional[TranscriptResult] = None,
+        api_results: Optional[list[dict]] = None,
         *,
         top_k: int = 20,
     ) -> list[CombatHighlight]:
@@ -143,11 +143,52 @@ class CombatSportsAnalyzer:
         signals: list[CombatSignal] = []
         if transcript:
             signals.extend(self.score_transcript(transcript))
+        if api_results:
+            signals.extend(self.score_api_results(api_results))
         if video_path:
             signals.extend(self.score_audio(video_path))
             signals.extend(self.score_motion(video_path))
 
         return self.rank_signals(signals, top_k=top_k)
+
+    async def search_api(
+        self,
+        tl_client,
+        index_id: str,
+        *,
+        query: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Search Twelve Labs or a compatible semantic video API for highlights."""
+        if not tl_client or not tl_client.is_available():
+            return []
+        search_query = query or self._config.api_query
+        results = await tl_client.search(index_id, search_query)
+        return results[:limit]
+
+    def score_api_results(self, api_results: list[dict]) -> list[CombatSignal]:
+        """Convert semantic video API matches into ranking signals."""
+        signals = []
+        for result in api_results:
+            start = float(result.get("start", 0.0) or 0.0)
+            end = float(result.get("end", start) or start)
+            confidence = result.get("confidence", result.get("score", 0.8))
+            try:
+                score = _clamp(float(confidence))
+            except (TypeError, ValueError):
+                score = 0.8
+            reason = result.get("reason") or result.get("query") or "semantic_match"
+            signals.append(
+                CombatSignal(
+                    time=(start + end) / 2,
+                    start_time=start,
+                    end_time=end,
+                    score=score,
+                    kind="api_semantic",
+                    reason=str(reason),
+                )
+            )
+        return signals
 
     def score_transcript(self, transcript: TranscriptResult) -> list[CombatSignal]:
         """Score transcript segments using combat-sports keyword groups."""
@@ -392,4 +433,3 @@ def _percentile(values: list[float], percentile: float) -> float:
     ordered = sorted(values)
     index = int(round((percentile / 100.0) * (len(ordered) - 1)))
     return ordered[index]
-

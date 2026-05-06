@@ -317,6 +317,10 @@ class CombatSportsHighlightConfig(BaseModel):
     post_action_padding: float = 1.2
     min_highlight_score: float = 0.72
     max_same_fight_segments: int = 3
+    api_query: str = (
+        "combat sports highlight: knockdown, knockout, fighter hurt, clean strike, "
+        "head kick, takedown, slam, submission attempt, tapout, crowd reaction, replay"
+    )
     weights: dict[str, float] = Field(default_factory=lambda: {
         "impact": 0.30,
         "motion": 0.20,
@@ -324,6 +328,7 @@ class CombatSportsHighlightConfig(BaseModel):
         "commentary_intensity": 0.14,
         "camera_cut": 0.10,
         "replay_or_slowmo": 0.08,
+        "api_semantic": 0.26,
     })
 
 
