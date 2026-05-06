@@ -55,8 +55,8 @@ class RemixerPage(QWidget):
         self.chk_rag.setChecked(True)
         self.chk_rag.setStyleSheet("color: #10B981; font-weight: bold; margin-top: 10px;")
         
-        lbl_topic = QLabel("Search Topic / Prompt:")
-        lbl_topic.setStyleSheet("color: #94A3B8;")
+        self.lbl_topic = QLabel("Search Topic / Prompt:")
+        self.lbl_topic.setStyleSheet("color: #94A3B8;")
         self.txt_topic = QTextEdit()
         self.txt_topic.setPlaceholderText("e.g. AI technology in 2024, travel highlights in Vietnam...")
         self.txt_topic.setMaximumHeight(60)
@@ -95,13 +95,16 @@ class RemixerPage(QWidget):
         self.cmb_style.addItems(["CapCut Yellow", "Modern White", "Glow Pink", "Elegant Gold", "Neon Cyber"])
         self.cmb_style.setCurrentText(self._get_style_full_name(self._config.remixer.effects.subtitles.preset_style))
         self.cmb_style.setStyleSheet("padding: 5px; background: #0F172A; color: white; border: 1px solid #334155;")
-        subtitle_group = self._build_subtitle_editor_group()
+        self.subtitle_group = self._build_subtitle_editor_group()
+        self.chk_rag.toggled.connect(self._sync_control_state)
+        self.chk_subtitles.toggled.connect(self._sync_control_state)
+        self.cmb_style.currentTextChanged.connect(self._update_subtitle_preview)
 
         left_layout.addWidget(lbl_dur)
         left_layout.addWidget(self.spn_dur)
         left_layout.addSpacing(10)
         left_layout.addWidget(self.chk_rag)
-        left_layout.addWidget(lbl_topic)
+        left_layout.addWidget(self.lbl_topic)
         left_layout.addWidget(self.txt_topic)
         left_layout.addSpacing(10)
         left_layout.addWidget(self.chk_meme)
@@ -111,13 +114,13 @@ class RemixerPage(QWidget):
         left_layout.addWidget(self.cmb_lang)
         left_layout.addWidget(lbl_style)
         left_layout.addWidget(self.cmb_style)
-        left_layout.addWidget(subtitle_group)
+        left_layout.addWidget(self.subtitle_group)
         left_layout.addSpacing(20)
         
         # 2. Source Folders
-        lbl_folders = QLabel("Select Source Folders (for V1):")
-        lbl_folders.setStyleSheet("color: #94A3B8; font-weight: bold;")
-        left_layout.addWidget(lbl_folders)
+        self.lbl_folders = QLabel("Select Source Folders (for V1):")
+        self.lbl_folders.setStyleSheet("color: #94A3B8; font-weight: bold;")
+        left_layout.addWidget(self.lbl_folders)
         
         self.list_folders = QListWidget()
         self.list_folders.setMinimumHeight(72)
@@ -133,6 +136,7 @@ class RemixerPage(QWidget):
         self.btn_remix.clicked.connect(self._on_remix)
         self.btn_remix.setStyleSheet("background: #10B981; color: white; padding: 12px; font-weight: bold; border-radius: 4px;")
         left_layout.addWidget(self.btn_remix)
+        self._left_frame = left_frame
         
         left_scroll = QScrollArea()
         left_scroll.setWidgetResizable(True)
@@ -161,10 +165,12 @@ class RemixerPage(QWidget):
         layout.addWidget(splitter)
         
         self._load_mock_folders()
+        self._sync_control_state()
 
     def _build_role_note(self, text: str) -> QLabel:
         label = QLabel(text)
         label.setWordWrap(True)
+        label.setMaximumHeight(54)
         label.setStyleSheet(
             "background:#0F172A;color:#CBD5E1;border:1px solid #334155;"
             "border-radius:6px;padding:8px;font-size:12px;"
@@ -216,12 +222,10 @@ class RemixerPage(QWidget):
         self.chk_word_highlight = QCheckBox("Highlight action keywords")
         self.chk_word_highlight.setChecked(subtitle_cfg.word_highlight)
 
-        self.txt_subtitle_preview = QTextEdit()
-        self.txt_subtitle_preview.setReadOnly(True)
-        self.txt_subtitle_preview.setFixedHeight(118)
-        self.txt_subtitle_preview.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.txt_subtitle_preview.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.txt_subtitle_preview.setPlainText("Cú ra đòn này tạo áp lực ngay lập tức.")
+        self.txt_subtitle_preview = QLabel("Cú ra đòn này tạo áp lực ngay lập tức.")
+        self.txt_subtitle_preview.setWordWrap(True)
+        self.txt_subtitle_preview.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.txt_subtitle_preview.setMinimumHeight(96)
 
         for widget in (
             self.txt_subtitle_font,
@@ -280,7 +284,7 @@ class RemixerPage(QWidget):
             self.txt_script.setText("⚠️ Vui lòng nhập chủ đề (Topic) khi dùng RAG Mode!")
             return
             
-        self.btn_remix.setEnabled(False)
+        self._set_running_state(True)
         self.btn_remix.setText("⏳ Orchestrating Remix v2...")
         self.txt_script.setText(f"Target Duration: {self.spn_dur.value()}s\n")
         self.txt_script.append(f"Mode: {'RAG v2.0' if is_v2 else 'Classic v1.0'}\n")
@@ -296,8 +300,7 @@ class RemixerPage(QWidget):
         worker = Worker(self._run_real_remix, is_v2, topic, self.spn_dur.value(), lang_code, style_id)
         worker.signals.result.connect(self._on_remix_done)
         worker.signals.error.connect(self._on_error)
-        worker.signals.finished.connect(lambda: self.btn_remix.setEnabled(True))
-        worker.signals.finished.connect(lambda: self.btn_remix.setText("🎬 Generate Remix"))
+        worker.signals.finished.connect(lambda: self._set_running_state(False))
         self._threadpool.start(worker)
 
     def _run_real_remix(self, is_v2: bool, topic: str, duration: int, lang: str, style: str) -> str:
@@ -324,6 +327,38 @@ class RemixerPage(QWidget):
 
     def _on_error(self, error_tuple):
         self.txt_script.append(f"\n❌ Lỗi: {error_tuple[1]}")
+
+    def _sync_control_state(self) -> None:
+        rag_enabled = self.chk_rag.isChecked()
+        subtitles_enabled = self.chk_subtitles.isChecked()
+
+        self.lbl_topic.setEnabled(rag_enabled)
+        self.txt_topic.setEnabled(rag_enabled)
+        self.lbl_folders.setEnabled(not rag_enabled)
+        self.list_folders.setEnabled(not rag_enabled)
+
+        for widget in (
+            self.cmb_style,
+            self.subtitle_group,
+            self.txt_subtitle_font,
+            self.spn_subtitle_size,
+            self.cmb_subtitle_position,
+            self.cmb_subtitle_effect,
+            self.spn_subtitle_outline,
+            self.spn_chars_per_line,
+            self.chk_word_highlight,
+            self.txt_subtitle_preview,
+        ):
+            widget.setEnabled(subtitles_enabled)
+
+        mode = "RAG v2" if rag_enabled else "Classic V1"
+        self.btn_remix.setText(f"🎬 Generate Remix ({mode})")
+
+    def _set_running_state(self, running: bool) -> None:
+        self._left_frame.setEnabled(not running)
+        self.btn_remix.setEnabled(not running)
+        if not running:
+            self._sync_control_state()
 
     def _get_language_full_name(self, code: str) -> str:
         return language_label(code)
