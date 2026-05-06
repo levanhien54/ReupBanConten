@@ -127,9 +127,10 @@ class MainWindow(QMainWindow):
             ("📊 Dashboard", 0),
             ("🔍 Scanner", 1),
             ("✂️ Cutter", 2),
-            ("🧠 Analyzer", 3),
-            ("🎬 Remixer", 4),
-            ("⚙️ Settings", 5)
+            ("🥊 Combat Studio", 3),
+            ("🧠 Analyzer", 4),
+            ("🎬 Remixer", 5),
+            ("⚙️ Settings", 6)
         ]
         
         for text, index in menus:
@@ -164,17 +165,22 @@ class MainWindow(QMainWindow):
         self.page_cutter = CutterPage(self._config)
         self.stacked_widget.addWidget(self.page_cutter)
 
-        # Page 3: Analyzer
+        # Page 3: Combat Studio
+        from src.ui.pages.combat_studio import CombatStudioPage
+        self.page_combat_studio = CombatStudioPage(self._config)
+        self.stacked_widget.addWidget(self.page_combat_studio)
+
+        # Page 4: Analyzer
         from src.ui.pages.analyzer import AnalyzerPage
         self.page_analyzer = AnalyzerPage(self._config)
         self.stacked_widget.addWidget(self.page_analyzer)
 
-        # Page 4: Remixer
+        # Page 5: Remixer
         from src.ui.pages.remixer import RemixerPage
         self.page_remixer = RemixerPage(self._config)
         self.stacked_widget.addWidget(self.page_remixer)
 
-        # Page 5: Settings
+        # Page 6: Settings
         from src.ui.pages.settings import SettingsPage
         self.page_settings = SettingsPage(self._config)
         self.stacked_widget.addWidget(self.page_settings)
