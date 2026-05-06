@@ -173,7 +173,7 @@ class RemixerPage(QWidget):
 
     def _build_subtitle_editor_group(self) -> QGroupBox:
         group = QGroupBox("Subtitle Editor")
-        group.setMinimumHeight(270)
+        group.setMinimumHeight(350)
         group.setStyleSheet("""
             QGroupBox {
                 color: #3B82F6; font-weight: bold;
@@ -217,8 +217,10 @@ class RemixerPage(QWidget):
         self.chk_word_highlight.setChecked(subtitle_cfg.word_highlight)
 
         self.txt_subtitle_preview = QTextEdit()
-        self.txt_subtitle_preview.setMinimumHeight(64)
-        self.txt_subtitle_preview.setMaximumHeight(90)
+        self.txt_subtitle_preview.setReadOnly(True)
+        self.txt_subtitle_preview.setFixedHeight(118)
+        self.txt_subtitle_preview.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.txt_subtitle_preview.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.txt_subtitle_preview.setPlainText("Cú ra đòn này tạo áp lực ngay lập tức.")
 
         for widget in (
@@ -373,8 +375,8 @@ class RemixerPage(QWidget):
         border = "#EF4444" if self.cmb_subtitle_effect.currentText() == "Impact Pop" else "#334155"
         self.txt_subtitle_preview.setStyleSheet(
             f"background: #0F172A; color: {color}; border: 2px solid {border}; "
-            f"font-family: {font}; font-size: {max(12, min(30, int(size / 2)))}px; "
-            "font-weight: bold; border-radius: 4px;"
+            f"font-family: {font}; font-size: {max(12, min(24, int(size / 2)))}px; "
+            "font-weight: bold; border-radius: 4px; padding: 8px;"
         )
 
     def _on_remix_done(self, output_path: str) -> None:
