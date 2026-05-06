@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -44,17 +45,30 @@ class CombatStudioPage(QWidget):
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(12)
+        root.setSpacing(0)
 
-        root.addWidget(self._build_inputs())
-        root.addWidget(self._build_options())
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        content = QWidget()
+        scroll.setWidget(content)
+
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        layout.addWidget(self._build_inputs())
+        layout.addWidget(self._build_options())
 
         self.btn_run = QPushButton("Run Combat Pipeline")
         self.btn_run.setStyleSheet(
             "background:#10B981;color:white;padding:12px;font-weight:bold;border-radius:6px;"
         )
         self.btn_run.clicked.connect(self._on_run)
-        root.addWidget(self.btn_run)
+        layout.addWidget(self.btn_run)
 
         audit_row = QHBoxLayout()
         self.btn_refresh_audit = QPushButton("Refresh Output Audit")
@@ -64,17 +78,21 @@ class CombatStudioPage(QWidget):
         audit_row.addWidget(self.btn_refresh_audit)
         audit_row.addWidget(self.btn_open_output)
         audit_row.addStretch(1)
-        root.addLayout(audit_row)
+        layout.addLayout(audit_row)
 
-        root.addWidget(self._build_results_table())
+        layout.addWidget(self._build_results_table())
 
         self.txt_output = QTextEdit()
         self.txt_output.setReadOnly(True)
+        self.txt_output.setMinimumHeight(150)
         self.txt_output.setStyleSheet(
             "background:#020617;color:#A5F3FC;border:1px solid #1E293B;"
             "border-radius:8px;padding:10px;font-family:Consolas;"
         )
-        root.addWidget(self.txt_output, 1)
+        layout.addWidget(self.txt_output)
+        layout.addStretch(1)
+
+        root.addWidget(scroll)
 
     def _build_inputs(self) -> QGroupBox:
         group = QGroupBox("Combat Source")
