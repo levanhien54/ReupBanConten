@@ -1,164 +1,121 @@
-# OpenShot Integration Plan
+# OpenShot Decision Record
 
-## Research Summary
+## Decision
 
-OpenShot is split into two useful projects:
+ReupBanConten will continue on the existing AI-first video remix architecture. We will not integrate or embed `openshot-qt` into the current project.
 
-- `openshot-qt`: the full desktop video editor UI, written in Python/Qt.
-- `libopenshot`: the media engine behind OpenShot, written in C++ with Python bindings.
+OpenShot remains useful as a reference project, but it is not the right primary direction for this codebase right now.
 
-For ReupBanConten, the practical integration target is `libopenshot`, not embedding `openshot-qt`. The current project already has a PySide6 UI and an AI pipeline; importing the full OpenShot editor would duplicate UI responsibilities and add a large dependency surface. `libopenshot` is a better fit for timeline assembly, transitions, keyframes, effects, and rendering.
+## Why We Are Not Using openshot-qt Directly
 
-Sources:
+`openshot-qt` is a full desktop video editor. ReupBanConten is an automated AI pipeline:
 
-- https://github.com/OpenShot/openshot-qt
-- https://github.com/OpenShot/libopenshot
+```text
+scan -> download -> analyze -> highlight scoring -> smart cut -> remix -> render
+```
 
-## Why Use libopenshot
+Embedding a full editor would add a second large UI, duplicate responsibilities with the existing PySide6 app, and make packaging harder on Windows. It also does not solve the highest-value problem for this project: finding the best combat-sports hooks and remixing them automatically.
 
-Current ReupBanConten rendering is mostly:
+Main reasons to avoid direct integration:
 
-- MoviePy for composition and transitions.
-- FFmpeg subprocesses for cuts, subtitles, color grading, and final render.
+- ReupBanConten already owns the UI and workflow.
+- The product goal is automation, not manual editing.
+- OpenShot UI code would increase maintenance and packaging complexity.
+- `openshot-qt` is GPLv3, which can affect redistribution choices.
+- The current bottleneck is highlight selection and render reliability, not editor UI.
 
-That works for prototypes, but it becomes fragile when the project needs real timeline features:
+## What We Keep From The OpenShot Research
 
-- multi-track video/audio,
-- keyframed zoom/pan/position,
-- consistent crossfades and transitions,
-- reusable timeline/project representation,
-- better preview/final render separation,
-- richer effects without manually writing FFmpeg filters for every case.
-
-`libopenshot` can become a render backend while the existing AI pipeline remains responsible for selecting highlights and producing `RemixScript`.
-
-## Recommended Architecture
-
-Add a backend boundary:
+The useful idea is not the GUI. The useful idea is a clean render boundary:
 
 ```text
 RemixScript
   -> TimelinePlan
-      -> MoviePy backend (current fallback)
-      -> FFmpeg backend (fast/simple concat/cut)
-      -> OpenShot backend (advanced timeline)
+      -> FFmpeg backend
+      -> MoviePy backend
+      -> optional future libopenshot backend
 ```
 
-Do not call OpenShot directly from `RemixOrchestratorV2`. Keep the orchestrator stable and let it choose a renderer from config:
+This can be implemented without bringing OpenShot into the project immediately. If a future version needs advanced keyframed timeline rendering, `libopenshot` can be evaluated as an optional backend only after the existing pipeline is stable.
 
-```yaml
-render:
-  backend: "moviepy"  # moviepy | ffmpeg | openshot
-  preview_resolution: "480x854"
-  final_resolution: "1080x1920"
-```
+## Current Development Direction
 
-## Proposed Modules
+Priority stays on the existing architecture:
+
+1. Improve combat-sports highlight detection.
+2. Make the cutter produce stronger hooks.
+3. Make remix sequencing more coherent and less repetitive.
+4. Stabilize the existing MoviePy/FFmpeg render path.
+5. Add a neutral timeline abstraction only when it reduces real complexity.
+
+## Near-Term Upgrade Roadmap
+
+### Phase 1: Combat Highlight Analyzer
+
+Build a fast analyzer for boxing, MMA, Muay Thai, kickboxing, BJJ, wrestling, judo, and similar sports.
+
+Signals:
+
+- impact-like audio spikes,
+- sudden motion bursts,
+- commentary keywords,
+- crowd reaction,
+- replay/slow-motion sections,
+- close-up reaction moments.
+
+Output:
+
+- ranked highlight candidates,
+- hook time,
+- start/end cut windows,
+- reason labels such as `impact`, `knockdown`, `submission`, `scramble`, `reaction`.
+
+### Phase 2: Hook-Oriented Smart Cutter
+
+Improve cuts for viewer retention:
+
+- start near the strongest visual/audio beat,
+- add 0.5-1.0s context before the impact,
+- keep payoff short,
+- optionally append replay/reaction,
+- reject dead time and flat audio.
+
+Target clip shape:
 
 ```text
-src/remixer/render_backends/
-  __init__.py
-  base.py
-  moviepy_backend.py
-  ffmpeg_backend.py
-  openshot_backend.py
-  timeline_plan.py
+0.0s-1.5s: hook
+1.5s-4.5s: payoff/action
+4.5s-6.0s: reaction/replay if available
 ```
 
-`timeline_plan.py` should define a neutral internal timeline:
+### Phase 3: Render Reliability
 
-```python
-class TimelineClip(BaseModel):
-    source_path: str
-    source_start: float = 0.0
-    source_end: float | None = None
-    timeline_start: float = 0.0
-    duration: float
-    track: int = 0
-    speed: float = 1.0
-    zoom: float = 1.0
-    brightness: float = 1.0
-    contrast: float = 1.0
-    mirror: bool = False
-    transition_in: str = "cut"
-    transition_duration: float = 0.0
-    audio_path: str | None = None
-```
+Keep the current renderer but organize it better:
 
-Then each backend maps that neutral model to its own implementation.
+- keep FFmpeg for accurate cuts, subtitles, and post-processing,
+- keep MoviePy for current composition features,
+- isolate render logic behind a backend interface,
+- add preview/final render profiles,
+- add render diagnostics and timeline debug JSON.
 
-## OpenShot Backend Responsibilities
+### Phase 4: Optional Timeline Backend
 
-The first `openshot_backend.py` should support only the features already used by `VideoAssembler`:
+Only after the above phases are stable:
 
-- place clips in sequence,
-- trim source start/end,
-- set speed,
-- add crossfade,
-- set output FPS/resolution,
-- render to MP4,
-- keep unsupported effects as no-ops with warnings.
+- evaluate whether `libopenshot` is worth adding as an optional backend,
+- do not import or copy `openshot-qt` UI,
+- keep MoviePy/FFmpeg as the default fallback.
 
-After that, add:
+## Practical Next Tasks
 
-- keyframed zoom/pan for 9:16 shorts,
-- multi-track overlays,
-- voiceover track,
-- BGM ducking track,
-- title/subtitle layers,
-- preview render profile.
+1. Add `src/analyzer/combat_sports.py`.
+2. Add models for combat highlight candidates.
+3. Add CLI command `combat-cut`.
+4. Store combat tags in the clip database.
+5. Add remix strategy `combat-hooks`.
+6. Add tests with synthetic audio spikes and transcript keywords.
 
-## Integration Steps
+## Final Position
 
-### Phase 1: Backend Boundary
-
-1. Create `TimelinePlan` and `RenderBackend` interface.
-2. Move current MoviePy logic from `VideoAssembler` into `MoviePyBackend`.
-3. Keep `VideoAssembler.assemble()` public API unchanged.
-4. Add config flag for backend selection.
-5. Test that current remixer still works with MoviePy.
-
-### Phase 2: OpenShot Proof of Concept
-
-1. Add optional dependency documentation for `libopenshot` Python bindings.
-2. Implement `OpenShotBackend.is_available()`.
-3. Render a 2-clip timeline with one crossfade.
-4. Add a smoke test that skips when `openshot` module is unavailable.
-
-### Phase 3: Feature Parity
-
-1. Map `RemixStep.start_time/end_time` to OpenShot clip trim.
-2. Map speed, mirror, brightness/contrast, zoom.
-3. Add voiceover track.
-4. Add ASS/subtitle burn as a final FFmpeg post-step until OpenShot title rendering is stable.
-
-### Phase 4: UI Integration
-
-1. Add Settings option: `Render backend`.
-2. Add diagnostics: backend availability and installed versions.
-3. Add preview render button.
-4. Add timeline export/debug JSON for failed render investigations.
-
-## Licensing Notes
-
-Important:
-
-- `openshot-qt` is GPLv3.
-- `libopenshot` is LGPLv3.
-
-If ReupBanConten stays private/local, this is mostly operational. If distributed commercially, prefer integrating with `libopenshot` as a dynamically linked optional backend and keep attribution/license notices. Avoid copying large parts of `openshot-qt` UI code into this project unless accepting GPLv3 obligations for the combined work.
-
-## Risks
-
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| Windows install complexity | High | Keep MoviePy/FFmpeg fallback. Make OpenShot optional. |
-| Python binding version mismatch | Medium | Add `is_available()` and skip tests if missing. |
-| Timeline API learning curve | Medium | Start with 2-clip proof of concept. |
-| Larger render dependency | Medium | Backend selection via config. |
-| License confusion | High | Use `libopenshot` backend, not copied `openshot-qt` UI. |
-
-## Decision
-
-Recommended path: integrate OpenShot through an optional `libopenshot` render backend after introducing a neutral timeline abstraction. Do not embed the full `openshot-qt` application into ReupBanConten.
+Continue improving ReupBanConten's current AI pipeline. Use OpenShot as a reference for timeline concepts only. Do not make OpenShot a core dependency at this stage.
 
