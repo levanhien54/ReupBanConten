@@ -791,6 +791,8 @@ def _write_combat_commentary_assets(
         )
         payload["audio_path"] = generated_audio
         payload["final_video_path"] = final_path if os.path.exists(final_path) else None
+        payload["final_video_probe"] = _probe_combat_video(final_path)
+        payload["final_video_ready"] = bool(payload["final_video_probe"].get("valid"))
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         click.echo(f"  Commentary assets: {json_path}, {ass_path}, {generated_audio}, {final_path}")
@@ -874,6 +876,49 @@ def _video_has_audio_stream(video_path: str) -> bool:
     except Exception:
         return False
     return result.returncode == 0 and "audio" in result.stdout
+
+
+def _probe_combat_video(video_path: str) -> dict:
+    import subprocess
+
+    if not os.path.exists(video_path):
+        return {"path": video_path, "exists": False, "valid": False}
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration:stream=codec_type,width,height",
+        "-of",
+        "json",
+        video_path,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        payload = json.loads(result.stdout or "{}") if result.returncode == 0 else {}
+    except Exception as exc:
+        return {
+            "path": video_path,
+            "exists": True,
+            "valid": False,
+            "size_bytes": os.path.getsize(video_path),
+            "error": str(exc),
+        }
+    streams = payload.get("streams") or []
+    video_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
+    has_audio = any(s.get("codec_type") == "audio" for s in streams)
+    duration = float((payload.get("format") or {}).get("duration") or 0.0)
+    return {
+        "path": video_path,
+        "exists": True,
+        "valid": bool(video_stream) and duration > 0,
+        "duration": round(duration, 3),
+        "width": int(video_stream.get("width") or 0),
+        "height": int(video_stream.get("height") or 0),
+        "has_audio": has_audio,
+        "size_bytes": os.path.getsize(video_path),
+        "is_vertical_9_16": int(video_stream.get("width") or 0) * 16 == int(video_stream.get("height") or 0) * 9,
+    }
 
 
 def _highlight_tags(highlight) -> set[str]:

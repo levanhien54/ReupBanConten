@@ -163,6 +163,8 @@ For each exported clip it writes:
 - `*.commentary.mp3`: generated commentary voiceover when voiceover is enabled,
 - `*_final.mp4`: clip with burned subtitles and mixed commentary voiceover when
   audio generation succeeds.
+- `final_video_probe` in the JSON stores duration, resolution, audio presence,
+  file size, and whether the final export is 9:16.
 
 This is the first practical bridge between visual highlight timing and the
 voiceover/subtitle layer. The next step is to optionally generate TTS audio per

@@ -5,7 +5,12 @@ import sys
 
 from src.core.config import AppConfig
 from src.core.types import CombatHighlight, CombatSignal, CommentarySegment, TranscriptResult, TranscriptSegment
-from src.main import _mux_combat_commentary_video, _video_has_audio_stream, _write_combat_commentary_assets
+from src.main import (
+    _mux_combat_commentary_video,
+    _probe_combat_video,
+    _video_has_audio_stream,
+    _write_combat_commentary_assets,
+)
 
 
 def test_combat_cut_dry_run_uses_transcript_json(tmp_path):
@@ -221,6 +226,12 @@ Dialogue: 0,0:00:00.00,0:00:00.80,PremiumStyle,,0,0,0,,Test subtitle
 
     assert output_path.exists()
     assert _video_has_audio_stream(str(output_path))
+    probe = _probe_combat_video(str(output_path))
+    assert probe["valid"]
+    assert probe["width"] == 1080
+    assert probe["height"] == 1920
+    assert probe["has_audio"]
+    assert probe["is_vertical_9_16"]
 
 
 def test_mux_combat_commentary_video_handles_clip_without_audio(tmp_path):
@@ -295,3 +306,6 @@ Dialogue: 0,0:00:00.20,0:00:00.80,PremiumStyle,,0,0,0,,Delayed subtitle
 
     assert output_path.exists()
     assert _video_has_audio_stream(str(output_path))
+    probe = _probe_combat_video(str(output_path))
+    assert probe["valid"]
+    assert probe["has_audio"]
