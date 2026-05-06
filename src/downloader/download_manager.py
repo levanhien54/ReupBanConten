@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import re
 import time
+import inspect
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Optional
@@ -246,11 +247,7 @@ class DownloadManager:
             "embedsubtitles": False,         # luu file .srt rieng
             # ────────────────────────────────────────────────
             "postprocessors": [
-                {
-                    "key": "FFmpegVideoConvertor",
-                    "preferedformat": self._config.preferred_format,
-                    "preferredformat": self._config.preferred_format,
-                },
+                self._build_video_convertor_pp(),
                 {
                     # Convert phu de sang SRT neu can
                     "key": "FFmpegSubtitlesConvertor",
@@ -271,6 +268,19 @@ class DownloadManager:
             opts["ratelimit"] = self._config.ytdlp.rate_limit
 
         return opts
+
+    def _build_video_convertor_pp(self) -> dict:
+        """Build FFmpegVideoConvertor options for old and new yt-dlp releases."""
+        pp = {"key": "FFmpegVideoConvertor"}
+        try:
+            from yt_dlp.postprocessor.ffmpeg import FFmpegVideoConvertorPP
+
+            params = inspect.signature(FFmpegVideoConvertorPP.__init__).parameters
+            format_arg = "preferredformat" if "preferredformat" in params else "preferedformat"
+        except Exception:
+            format_arg = "preferedformat"
+        pp[format_arg] = self._config.preferred_format
+        return pp
 
     def _download_single(
         self,
@@ -350,7 +360,8 @@ class DownloadManager:
             )
 
         if any(k in msg_lower for k in ["requested format", "no video formats",
-                                         "format not available"]):
+                                         "format not available", "preferredformat",
+                                         "preferedformat"]):
             return (
                 DownloadErrorCode.FORMAT_ERROR,
                 "Không tìm được định dạng video phù hợp."
