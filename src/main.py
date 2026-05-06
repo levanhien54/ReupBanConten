@@ -322,6 +322,7 @@ def combat_cut(
                 highlight=highlight,
                 commentary_segment=commentary_script.segments[idx - 1],
                 transcript=transcript,
+                language=commentary_language,
             )
         click.echo(f"  Exported clip #{clip_id}: {clip.file_path}")
 
@@ -740,31 +741,99 @@ def _write_combat_commentary_assets(
     highlight,
     commentary_segment,
     transcript,
+    language: str = "vi",
 ) -> None:
     from src.core.types import CommentaryScript
     from src.remixer.ass_generator import ASSGenerator
     from src.remixer.combat_commentary import build_evidence_packet
+    from src.remixer.voiceover_engine import VoiceoverEngine
 
     base_path = os.path.splitext(clip_path)[0]
-    packet = build_evidence_packet(highlight, transcript=transcript, sport="combat")
+    packet = build_evidence_packet(highlight, transcript=transcript, sport="combat", language=language)
     payload = {
         "clip_path": clip_path,
         "highlight": highlight.model_dump(),
         "commentary": commentary_segment.model_dump(),
         "evidence": packet.__dict__,
+        "language": language,
     }
     json_path = base_path + ".commentary.json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
+    script = CommentaryScript(segments=[commentary_segment])
     ass_path = base_path + ".ass"
     ASSGenerator(config.remixer.effects.subtitles).generate(
-        CommentaryScript(segments=[commentary_segment]),
+        script,
         ass_path,
         width=1080,
         height=1920,
     )
-    click.echo(f"  Commentary assets: {json_path}, {ass_path}")
+
+    generated_audio = None
+    audio_path = base_path + ".commentary.mp3"
+    final_path = base_path + "_final.mp4"
+    if config.voiceover.enabled:
+        generated_audio = asyncio.run(
+            VoiceoverEngine(config.voiceover).generate_audio(
+                commentary_segment.text,
+                audio_path,
+                language,
+            )
+        )
+    if generated_audio:
+        _mux_combat_commentary_video(
+            clip_path=clip_path,
+            ass_path=ass_path,
+            audio_path=generated_audio,
+            output_path=final_path,
+        )
+        payload["audio_path"] = generated_audio
+        payload["final_video_path"] = final_path if os.path.exists(final_path) else None
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        click.echo(f"  Commentary assets: {json_path}, {ass_path}, {generated_audio}, {final_path}")
+    else:
+        click.echo(f"  Commentary assets: {json_path}, {ass_path}")
+
+
+def _mux_combat_commentary_video(*, clip_path: str, ass_path: str, audio_path: str, output_path: str) -> None:
+    import subprocess
+
+    safe_ass_path = ass_path.replace("\\", "/").replace(":", "\\:")
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        clip_path,
+        "-i",
+        audio_path,
+        "-filter_complex",
+        f"[0:v]ass='{safe_ass_path}'[v];[0:a]volume=0.28[base];[1:a]volume=1.0[vo];[base][vo]amix=inputs=2:duration=first:dropout_transition=0[a]",
+        "-map",
+        "[v]",
+        "-map",
+        "[a]",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "18",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=600)
+    if result.returncode != 0:
+        click.secho(
+            f"  Commentary mux failed: {result.stderr.decode('utf-8', errors='replace')[:300]}",
+            fg="yellow",
+        )
 
 
 def _highlight_tags(highlight) -> set[str]:

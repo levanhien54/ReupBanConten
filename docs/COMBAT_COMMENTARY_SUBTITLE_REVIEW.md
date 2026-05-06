@@ -160,6 +160,9 @@ For each exported clip it writes:
 
 - `*.commentary.json`: highlight, commentary segment, and evidence timeline,
 - `*.ass`: burn-in subtitle file using the configured subtitle style.
+- `*.commentary.mp3`: generated commentary voiceover when voiceover is enabled,
+- `*_final.mp4`: clip with burned subtitles and mixed commentary voiceover when
+  audio generation succeeds.
 
 This is the first practical bridge between visual highlight timing and the
 voiceover/subtitle layer. The next step is to optionally generate TTS audio per
