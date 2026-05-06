@@ -165,6 +165,14 @@ This is the first practical bridge between visual highlight timing and the
 voiceover/subtitle layer. The next step is to optionally generate TTS audio per
 clip and mux it into the exported highlight.
 
+Vertical export:
+
+- `combat-cut` now exports highlights as 1080x1920 vertical clips.
+- The vertical filter uses the common FFmpeg short-video pattern:
+  blurred full-frame background plus centered foreground.
+- This keeps the original fight action visible, avoids black bars, and keeps
+  subtitle placement aligned with the ASS canvas.
+
 Language selection:
 
 - The Remix UI commentary language selector now drives the script prompt, so

@@ -349,6 +349,48 @@ class TestCutPipeline:
         cap.release()
 
         expected_frames = int((end - start) * fps)
+        tolerance = int(fps * 0.5)  # Â±0.5s tolerance
+
+        print(f"\n  Expected ~{expected_frames} frames, got {actual_frames} ({actual_fps:.1f} fps)")
+        print(f"  Accuracy: {abs(actual_frames - expected_frames)} frames off")
+        assert abs(actual_frames - expected_frames) <= tolerance, (
+            f"Sai lá»‡ch quĂ¡ lá»›n: {abs(actual_frames - expected_frames)} frames "
+            f"(> {tolerance} frames tolerance)"
+        )
+
+    def test_smart_clipper_can_export_blurred_vertical_mp4(self, tmp_path):
+        if not self._ffmpeg_available():
+            pytest.skip("ffmpeg khĂ´ng cĂ³ sáºµn")
+
+        from src.core.config import CutterConfig
+        from src.cutter.smart_clipper import SmartClipper
+        from src.remixer.vertical_video import build_blur_background_filter
+
+        src = str(tmp_path / "src.avi")
+        frames = [np.random.randint(50, 200, (180, 320, 3), dtype=np.uint8) for _ in range(90)]
+        _write_video(src, frames, 30.0)
+
+        clip = SmartClipper(CutterConfig()).export_clip(
+            video_id="vertical_test",
+            video_path=src,
+            start_time=0.0,
+            end_time=2.0,
+            output_dir=str(tmp_path),
+            video_filter=build_blur_background_filter(width=1080, height=1920),
+        )
+
+        cap = cv2.VideoCapture(clip.file_path)
+        assert cap.isOpened(), "Clip Ä‘áº§u ra khĂ´ng Ä‘á»c Ä‘Æ°á»£c"
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        ret, frame = cap.read()
+        cap.release()
+
+        assert ret and frame is not None
+        assert (width, height) == (1080, 1920)
+        return
+
+        expected_frames = int((end - start) * fps)
         tolerance = int(fps * 0.5)  # ±0.5s tolerance
 
         print(f"\n  Expected ~{expected_frames} frames, got {actual_frames} ({actual_fps:.1f} fps)")

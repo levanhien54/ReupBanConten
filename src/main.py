@@ -223,6 +223,7 @@ def combat_cut(
     from src.analyzer.combat_sports import CombatSportsAnalyzer
     from src.core.database import ClipRepository
     from src.cutter.smart_clipper import SmartClipper
+    from src.remixer.vertical_video import build_blur_background_filter
 
     resolved_video_id = video_id or _safe_video_id(input_path)
     transcript = _load_transcript_for_combat_cut(
@@ -270,6 +271,7 @@ def combat_cut(
     clipper = SmartClipper(config.cutter)
     clip_repo = ClipRepository(get_database())
     destination = output_dir or os.path.join(config.storage.clips, "combat")
+    vertical_filter = build_blur_background_filter(width=1080, height=1920)
     commentary_script = None
     if write_commentary:
         commentary_script = asyncio.run(
@@ -287,6 +289,7 @@ def combat_cut(
             start_time=highlight.start_time,
             end_time=highlight.end_time,
             output_dir=destination,
+            video_filter=vertical_filter,
         )
         clip_id = clip_repo.insert(
             video_id=resolved_video_id,

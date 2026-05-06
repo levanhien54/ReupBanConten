@@ -28,6 +28,7 @@ class SmartClipper:
         start_time: float,
         end_time: float,
         output_dir: str,
+        video_filter: str | None = None,
     ) -> Clip:
         """Sử dụng FFmpeg stream copy để cắt cực nhanh không re-encode."""
         os.makedirs(output_dir, exist_ok=True)
@@ -38,15 +39,38 @@ class SmartClipper:
         output_path = os.path.join(output_dir, filename)
 
         # Cắt nhanh không encode
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(start_time),
-            "-t", str(duration),
-            "-i", video_path,
-            "-c", "copy",
-            "-avoid_negative_ts", "make_zero",
-            output_path
-        ]
+        cmd = ["ffmpeg", "-y", "-ss", str(start_time), "-t", str(duration), "-i", video_path]
+        if video_filter:
+            cmd.extend([
+                "-filter_complex",
+                video_filter,
+                "-map",
+                "[v]",
+                "-map",
+                "0:a?",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                "18",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
+                "-shortest",
+                output_path,
+            ])
+        else:
+            cmd.extend([
+                "-c",
+                "copy",
+                "-avoid_negative_ts",
+                "make_zero",
+                output_path,
+            ])
 
         try:
             subprocess.run(cmd, capture_output=True, check=True)
