@@ -6,16 +6,20 @@ import subprocess
 
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -61,6 +65,8 @@ class CombatStudioPage(QWidget):
         audit_row.addWidget(self.btn_open_output)
         audit_row.addStretch(1)
         root.addLayout(audit_row)
+
+        root.addWidget(self._build_results_table())
 
         self.txt_output = QTextEdit()
         self.txt_output.setReadOnly(True)
@@ -134,6 +140,46 @@ class CombatStudioPage(QWidget):
         form.addRow(self.chk_transcript_only)
         return group
 
+    def _build_results_table(self) -> QTableWidget:
+        self.table_results = QTableWidget(0, 8)
+        self.table_results.setHorizontalHeaderLabels(
+            ["#", "Status", "Score", "Hook", "Video", "Audio", "Language", "Commentary Preview"]
+        )
+        header = self.table_results.horizontalHeader()
+        for idx, mode in enumerate(
+            [
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.ResizeToContents,
+                QHeaderView.ResizeMode.Stretch,
+            ]
+        ):
+            header.setSectionResizeMode(idx, mode)
+
+        self.table_results.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_results.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_results.setAlternatingRowColors(True)
+        self.table_results.setMinimumHeight(170)
+        self.table_results.setStyleSheet(
+            """
+            QTableWidget {
+                background:#1E293B; alternate-background-color:#162032;
+                border:1px solid #334155; border-radius:8px;
+                color:#F8FAFC; gridline-color:#1E293B;
+            }
+            QTableWidget::item:selected { background:#2563EB; }
+            QHeaderView::section {
+                background:#0F172A; color:#93C5FD;
+                padding:6px; border:none; font-weight:bold;
+            }
+            """
+        )
+        return self.table_results
+
     def _choose_video(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Select fight video", "", "Video Files (*.mp4 *.mov *.mkv *.webm *.avi)")
         if path:
@@ -185,14 +231,42 @@ class CombatStudioPage(QWidget):
         return output
 
     def _on_done(self, output: str) -> None:
-        self.txt_output.setText(output + "\n\nOutput Audit:\n" + self._load_audit_text())
+        audit_text = self._refresh_results_table()
+        self.txt_output.setText(output + "\n\nOutput Audit:\n" + audit_text)
 
     def _refresh_audit(self) -> None:
-        self.txt_output.setText("Output Audit:\n" + self._load_audit_text())
+        self.txt_output.setText("Output Audit:\n" + self._refresh_results_table())
 
-    def _load_audit_text(self) -> str:
+    def _refresh_results_table(self) -> str:
         out_dir = self.txt_output_dir.text().strip()
-        return format_combat_output_summary(load_combat_output_summaries(out_dir))
+        summaries = load_combat_output_summaries(out_dir)
+        self._populate_results_table(summaries)
+        return format_combat_output_summary(summaries)
+
+    def _populate_results_table(self, summaries) -> None:
+        self.table_results.setRowCount(len(summaries))
+        for row, item in enumerate(summaries):
+            status = "READY" if item.ready else "CHECK"
+            video = f"{item.width}x{item.height}" if item.width and item.height else "-"
+            audio = "yes" if item.has_audio else "no"
+            cells = [
+                str(row + 1),
+                status,
+                f"{item.score:.2f}",
+                f"{item.hook_time:.2f}s",
+                video,
+                audio,
+                item.language or "-",
+                " ".join(item.commentary_text.split()) or "-",
+            ]
+            for col, text in enumerate(cells):
+                cell = QTableWidgetItem(text)
+                if col == 7:
+                    cell.setToolTip(item.commentary_text)
+                elif col == 1:
+                    cell.setToolTip(item.final_video_path or item.json_path)
+                self.table_results.setItem(row, col, cell)
+        self.table_results.resizeRowsToContents()
 
     def _open_output_dir(self) -> None:
         out_dir = self.txt_output_dir.text().strip()
