@@ -197,6 +197,13 @@ def download(url: str, folder: Optional[str]) -> None:
 @click.option("--api-limit", default=20, show_default=True, help="Maximum semantic API matches")
 @click.option("--write-commentary", is_flag=True, help="Write evidence-based commentary JSON and ASS subtitles")
 @click.option("--commentary-language", default="vi", show_default=True, help="Language code for generated commentary/subtitles")
+@click.option(
+    "--vertical-mode",
+    type=click.Choice(["blur", "copy"]),
+    default="blur",
+    show_default=True,
+    help="Export format: blur creates 1080x1920 with blurred background; copy keeps source format",
+)
 @click.option("--dry-run", is_flag=True, help="Rank highlights without exporting clips")
 def combat_cut(
     input_path: str,
@@ -212,6 +219,7 @@ def combat_cut(
     api_limit: int,
     write_commentary: bool,
     commentary_language: str,
+    vertical_mode: str,
     dry_run: bool,
 ) -> None:
     """Rank and cut hook-focused combat-sports highlights."""
@@ -223,7 +231,7 @@ def combat_cut(
     from src.analyzer.combat_sports import CombatSportsAnalyzer
     from src.core.database import ClipRepository
     from src.cutter.smart_clipper import SmartClipper
-    from src.remixer.vertical_video import build_blur_background_filter
+    from src.remixer.vertical_video import build_vertical_filter
 
     resolved_video_id = video_id or _safe_video_id(input_path)
     transcript = _load_transcript_for_combat_cut(
@@ -271,7 +279,8 @@ def combat_cut(
     clipper = SmartClipper(config.cutter)
     clip_repo = ClipRepository(get_database())
     destination = output_dir or os.path.join(config.storage.clips, "combat")
-    vertical_filter = build_blur_background_filter(width=1080, height=1920)
+    vertical_filter = build_vertical_filter(vertical_mode, width=1080, height=1920)
+    click.echo(f"Vertical export mode: {vertical_mode}")
     commentary_script = None
     if write_commentary:
         commentary_script = asyncio.run(

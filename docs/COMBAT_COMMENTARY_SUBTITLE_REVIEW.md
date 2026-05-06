@@ -172,6 +172,8 @@ Vertical export:
   blurred full-frame background plus centered foreground.
 - This keeps the original fight action visible, avoids black bars, and keeps
   subtitle placement aligned with the ASS canvas.
+- Use `--vertical-mode copy` to keep the original source format and fast
+  stream-copy path for debugging or archival exports.
 
 Language selection:
 

@@ -95,6 +95,20 @@ def test_combat_cut_api_fallback_does_not_block_local_ranking(tmp_path, monkeypa
     assert "Found 1 combat highlights" in stdout
 
 
+def test_combat_cut_help_lists_vertical_mode():
+    result = subprocess.run(
+        [sys.executable, "-m", "src.main", "combat-cut", "--help"],
+        cwd="D:/ReupBanConten",
+        capture_output=True,
+        timeout=30,
+    )
+
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    assert result.returncode == 0
+    assert "--vertical-mode" in stdout
+    assert "[blur|copy]" in stdout
+
+
 def test_write_combat_commentary_assets_creates_json_and_ass(tmp_path):
     clip = tmp_path / "clip.mp4"
     clip.write_bytes(b"fake")
