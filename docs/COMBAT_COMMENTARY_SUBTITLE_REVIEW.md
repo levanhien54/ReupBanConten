@@ -152,7 +152,8 @@ python -m src.main combat-cut `
   --input .\data\downloads\fight.mp4 `
   --transcript .\data\transcripts\fight.json `
   --top 10 `
-  --write-commentary
+  --write-commentary `
+  --commentary-language vi
 ```
 
 For each exported clip it writes:
@@ -163,6 +164,14 @@ For each exported clip it writes:
 This is the first practical bridge between visual highlight timing and the
 voiceover/subtitle layer. The next step is to optionally generate TTS audio per
 clip and mux it into the exported highlight.
+
+Language selection:
+
+- The Remix UI commentary language selector now drives the script prompt, so
+  `title`, `description`, and every `commentary_text` are requested in that
+  selected language.
+- `combat-cut --write-commentary` accepts `--commentary-language`, so subtitle
+  and commentary assets can be generated in the requested language.
 
 ## Recommended Prompt Rules
 

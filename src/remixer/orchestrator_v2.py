@@ -57,7 +57,10 @@ class RemixOrchestratorV2:
         logger.info(f"🚀 Starting Remix v2.0 for topic: {topic}")
         
         # 1. Sinh kịch bản
-        script = await self.script_engine.generate_viral_script(topic)
+        script = await self.script_engine.generate_viral_script(
+            topic,
+            commentary_language=self._config.voiceover.commentary.language,
+        )
         logger.info(f"📜 Script generated: {script.title}")
         
         # 2. Chọn clips

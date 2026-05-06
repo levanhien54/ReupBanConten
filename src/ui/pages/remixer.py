@@ -262,6 +262,7 @@ class RemixerPage(QWidget):
         # Lấy cấu hình từ UI
         lang_code = self._get_language_code(self.cmb_lang.currentText())
         style_id = self._get_style_id(self.cmb_style.currentText())
+        self._config.voiceover.commentary.language = lang_code
         self._apply_subtitle_ui_to_config(style_id)
         
         worker = Worker(self._run_real_remix, is_v2, topic, self.spn_dur.value(), lang_code, style_id)

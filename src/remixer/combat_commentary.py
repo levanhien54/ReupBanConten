@@ -23,16 +23,27 @@ UNSUPPORTED_CLAIMS: dict[str, tuple[str, ...]] = {
 }
 
 SAFE_LINES = {
-    "impact": "Cú ra đòn này tạo áp lực ngay lập tức.",
-    "submission": "Pha khóa siết này buộc đối thủ phải cảnh giác.",
-    "scramble": "Tình huống áp sát khiến nhịp trận đổi chiều.",
-    "motion": "Tốc độ pha này tăng lên rất nhanh.",
-    "crowd_audio": "Khán giả phản ứng mạnh với khoảnh khắc này.",
-    "api_semantic": "Đây là điểm nhấn đáng chú ý của pha bóng.",
-    "default": "Khoảnh khắc này có thể đổi chiều trận đấu.",
+    "vi": {
+        "impact": "Cú ra đòn này tạo áp lực ngay lập tức.",
+        "submission": "Pha khóa siết này buộc đối thủ phải cảnh giác.",
+        "scramble": "Tình huống áp sát khiến nhịp trận đổi chiều.",
+        "motion": "Tốc độ pha này tăng lên rất nhanh.",
+        "crowd_audio": "Khán giả phản ứng mạnh với khoảnh khắc này.",
+        "api_semantic": "Đây là điểm nhấn đáng chú ý của pha đấu.",
+        "default": "Khoảnh khắc này có thể đổi chiều trận đấu.",
+    },
+    "en": {
+        "impact": "That strike changes the pressure immediately.",
+        "submission": "That submission threat forces a quick reaction.",
+        "scramble": "This scramble can swing the whole exchange.",
+        "motion": "The pace jumps fast in this moment.",
+        "crowd_audio": "The crowd reacts hard to this sequence.",
+        "api_semantic": "This is the key moment to watch.",
+        "default": "This moment can shift the fight quickly.",
+    },
 }
 
-IMPACT_KEYWORDS = ("gục", "knockout", "knockdown", "đòn", "siết", "ngã", "áp lực", "đổi chiều")
+IMPACT_KEYWORDS = ("gục", "knockout", "knockdown", "đòn", "strike", "siết", "ngã", "áp lực", "pressure")
 
 
 @dataclass
@@ -48,10 +59,11 @@ class CombatEvidencePacket:
     visual_labels: list[str] = field(default_factory=list)
     timeline: list[dict] = field(default_factory=list)
     known_facts: dict[str, Optional[str]] = field(default_factory=dict)
+    language: str = "vi"
 
 
 class CombatCommentaryGenerator:
-    """Generate Vietnamese commentary that only uses supported evidence."""
+    """Generate commentary that only uses supported evidence."""
 
     def __init__(self, llm: Optional[LLMProvider] = None) -> None:
         self._llm = llm
@@ -63,6 +75,7 @@ class CombatCommentaryGenerator:
         transcript: Optional[TranscriptResult] = None,
         sport: str = "combat",
         known_facts: Optional[dict[str, Optional[str]]] = None,
+        language: str = "vi",
     ) -> CommentaryScript:
         packets = [
             build_evidence_packet(
@@ -70,13 +83,13 @@ class CombatCommentaryGenerator:
                 transcript=transcript,
                 sport=sport,
                 known_facts=known_facts,
+                language=language,
             )
             for highlight in highlights
         ]
         segments = []
         for packet in packets:
-            segment = await self.generate_segment(packet)
-            segments.append(segment)
+            segments.append(await self.generate_segment(packet))
         return CommentaryScript(
             segments=segments,
             total_segments=len(segments),
@@ -93,18 +106,22 @@ class CombatCommentaryGenerator:
         return fallback_segment(packet)
 
     async def _generate_with_llm(self, packet: CombatEvidencePacket) -> CommentarySegment:
-        prompt = build_commentary_prompt(packet)
-        data = await self._llm.generate_json(prompt, temperature=0.2, max_tokens=900)
+        data = await self._llm.generate_json(
+            build_commentary_prompt(packet),
+            temperature=0.2,
+            max_tokens=900,
+        )
         item = (data.get("segments") or [data])[0]
+        text = str(item.get("text", "")).strip()
         return CommentarySegment(
-            text=str(item.get("text", "")).strip(),
+            text=text,
             start_time=float(item.get("start_time", max(0.0, packet.hook_time - packet.start_time - 0.2))),
             duration_estimate=float(item.get("duration_estimate", 1.4)),
             emotion=str(item.get("emotion", "tense")),
             evidence_used=[str(x) for x in item.get("evidence_used", packet.signals)],
             certainty=str(item.get("certainty", _certainty(packet))),
             style=str(item.get("style", _style(packet))),
-            keywords=[str(x) for x in item.get("keywords", _keywords(item.get("text", "")))],
+            keywords=[str(x) for x in item.get("keywords", _keywords(text))],
         )
 
 
@@ -114,14 +131,14 @@ def build_evidence_packet(
     transcript: Optional[TranscriptResult] = None,
     sport: str = "combat",
     known_facts: Optional[dict[str, Optional[str]]] = None,
+    language: str = "vi",
 ) -> CombatEvidencePacket:
     signals = sorted({signal.kind for signal in highlight.signals})
-    text = _transcript_near_highlight(transcript, highlight) if transcript else ""
-    timeline = build_timeline_evidence(highlight, transcript=transcript)
-    visual_labels = []
-    for signal in highlight.signals:
-        if signal.kind == "api_semantic" and signal.reason:
-            visual_labels.append(signal.reason)
+    visual_labels = [
+        signal.reason
+        for signal in highlight.signals
+        if signal.kind == "api_semantic" and signal.reason
+    ]
     return CombatEvidencePacket(
         sport=sport,
         start_time=highlight.start_time,
@@ -130,10 +147,11 @@ def build_evidence_packet(
         confidence=highlight.score,
         signals=signals,
         reasons=highlight.reasons,
-        transcript=text,
+        transcript=_transcript_near_highlight(transcript, highlight) if transcript else "",
         visual_labels=visual_labels,
-        timeline=timeline,
+        timeline=build_timeline_evidence(highlight, transcript=transcript),
         known_facts=known_facts or {},
+        language=language,
     )
 
 
@@ -142,7 +160,6 @@ def build_timeline_evidence(
     *,
     transcript: Optional[TranscriptResult] = None,
 ) -> list[dict]:
-    """Build relative timing evidence for commentary/subtitle alignment."""
     events = []
     clip_start = highlight.start_time
     for signal in highlight.signals:
@@ -186,19 +203,20 @@ def build_timeline_evidence(
 
 
 def build_commentary_prompt(packet: CombatEvidencePacket) -> str:
+    language_name = _language_name(packet.language)
     return (
-        "Bạn là bình luận viên thể thao đối kháng chuyên nghiệp.\n"
-        "Chỉ bình luận dựa trên evidence được cung cấp.\n"
-        "Không bịa tên võ sĩ, hiệp đấu, kết quả, đai vô địch, chấn thương, hoặc luật.\n"
-        "Nếu evidence chưa chắc chắn, dùng ngôn ngữ thận trọng.\n"
-        "Viết tiếng Việt tự nhiên, mạnh, ngắn, đúng nhịp Shorts.\n"
-        "Mỗi câu 6-14 từ. Không emoji. Không hashtag.\n"
-        "Trả JSON có key segments.\n\n"
+        "You are a professional combat-sports commentator.\n"
+        "Only comment based on the supplied evidence.\n"
+        "Do not invent fighter names, round, result, title, injury, or rules.\n"
+        "If evidence is uncertain, use cautious language.\n"
+        f"Write every commentary line in {language_name}.\n"
+        "Use natural, strong, short Shorts pacing. Each line should be 6-14 words.\n"
+        "No emoji. No hashtag. Return valid JSON with key segments.\n\n"
         f"EVIDENCE:\n{json.dumps(asdict(packet), ensure_ascii=False, indent=2)}\n\n"
         "JSON schema: {\"segments\":[{\"start_time\":0.0,\"duration_estimate\":1.4,"
         "\"text\":\"...\",\"emotion\":\"tense\",\"evidence_used\":[\"impact\"],"
         "\"certainty\":\"high|medium|low\",\"style\":\"setup|impact|replay|cta\","
-        "\"keywords\":[\"đòn\"]}]}"
+        "\"keywords\":[\"strike\"]}]}"
     )
 
 
@@ -238,7 +256,8 @@ def unsupported_claims(text: str, packet: CombatEvidencePacket) -> list[str]:
 
 def fallback_segment(packet: CombatEvidencePacket) -> CommentarySegment:
     primary = _primary_signal(packet)
-    text = SAFE_LINES.get(primary, SAFE_LINES["default"])
+    lines = SAFE_LINES.get(packet.language, SAFE_LINES["vi"])
+    text = lines.get(primary, lines["default"])
     start = max(0.0, packet.hook_time - packet.start_time - 0.25)
     return CommentarySegment(
         text=text,
@@ -298,3 +317,14 @@ def _keywords(text: str) -> list[str]:
 
 def _normalize(text: str) -> str:
     return text.lower()
+
+
+def _language_name(code: str) -> str:
+    return {
+        "vi": "Vietnamese",
+        "en": "English",
+        "zh": "Chinese",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "es": "Spanish",
+    }.get(code, code or "Vietnamese")

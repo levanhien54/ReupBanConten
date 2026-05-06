@@ -62,6 +62,17 @@ async def test_combat_commentary_rejects_unsupported_knockout_claim():
     assert script.segments[0].evidence_used == ["impact", "motion"]
 
 
+@pytest.mark.asyncio
+async def test_combat_commentary_fallback_uses_selected_language():
+    generator = CombatCommentaryGenerator()
+
+    script = await generator.generate_script([_highlight()], language="en")
+
+    assert len(script.segments) == 1
+    assert "strike" in script.segments[0].text.lower()
+    assert "áp lực" not in script.segments[0].text.lower()
+
+
 def test_unsupported_claims_allow_supported_knockdown_transcript():
     transcript = TranscriptResult(
         full_text="",

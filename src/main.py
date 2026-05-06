@@ -196,6 +196,7 @@ def download(url: str, folder: Optional[str]) -> None:
 @click.option("--api-query", help="Semantic query for combat highlights")
 @click.option("--api-limit", default=20, show_default=True, help="Maximum semantic API matches")
 @click.option("--write-commentary", is_flag=True, help="Write evidence-based commentary JSON and ASS subtitles")
+@click.option("--commentary-language", default="vi", show_default=True, help="Language code for generated commentary/subtitles")
 @click.option("--dry-run", is_flag=True, help="Rank highlights without exporting clips")
 def combat_cut(
     input_path: str,
@@ -210,6 +211,7 @@ def combat_cut(
     api_query: Optional[str],
     api_limit: int,
     write_commentary: bool,
+    commentary_language: str,
     dry_run: bool,
 ) -> None:
     """Rank and cut hook-focused combat-sports highlights."""
@@ -274,6 +276,7 @@ def combat_cut(
             _build_combat_commentary(
                 highlights=highlights,
                 transcript=transcript,
+                language=commentary_language,
             )
         )
     exported = 0
@@ -706,7 +709,7 @@ def _search_combat_api(
         return []
 
 
-async def _build_combat_commentary(*, highlights, transcript):
+async def _build_combat_commentary(*, highlights, transcript, language: str = "vi"):
     from src.remixer.combat_commentary import CombatCommentaryGenerator
 
     generator = CombatCommentaryGenerator()
@@ -714,6 +717,7 @@ async def _build_combat_commentary(*, highlights, transcript):
         highlights,
         transcript=transcript,
         sport="combat",
+        language=language,
     )
 
 
