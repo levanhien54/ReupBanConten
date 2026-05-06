@@ -787,6 +787,7 @@ def _write_combat_commentary_assets(
             ass_path=ass_path,
             audio_path=generated_audio,
             output_path=final_path,
+            voice_start=commentary_segment.start_time,
         )
         payload["audio_path"] = generated_audio
         payload["final_video_path"] = final_path if os.path.exists(final_path) else None
@@ -797,10 +798,27 @@ def _write_combat_commentary_assets(
         click.echo(f"  Commentary assets: {json_path}, {ass_path}")
 
 
-def _mux_combat_commentary_video(*, clip_path: str, ass_path: str, audio_path: str, output_path: str) -> None:
+def _mux_combat_commentary_video(
+    *,
+    clip_path: str,
+    ass_path: str,
+    audio_path: str,
+    output_path: str,
+    voice_start: float = 0.0,
+) -> None:
     import subprocess
 
     safe_ass_path = ass_path.replace("\\", "/").replace(":", "\\:")
+    voice_delay_ms = max(0, int(voice_start * 1000))
+    has_audio = _video_has_audio_stream(clip_path)
+    if has_audio:
+        audio_filter = (
+            f"[1:a]adelay={voice_delay_ms}:all=1,volume=1.0[vo];"
+            "[0:a]volume=0.28[base];"
+            "[base][vo]amix=inputs=2:duration=first:dropout_transition=0[a]"
+        )
+    else:
+        audio_filter = f"[1:a]adelay={voice_delay_ms}:all=1,volume=1.0[a]"
     cmd = [
         "ffmpeg",
         "-y",
@@ -809,7 +827,7 @@ def _mux_combat_commentary_video(*, clip_path: str, ass_path: str, audio_path: s
         "-i",
         audio_path,
         "-filter_complex",
-        f"[0:v]ass='{safe_ass_path}'[v];[0:a]volume=0.28[base];[1:a]volume=1.0[vo];[base][vo]amix=inputs=2:duration=first:dropout_transition=0[a]",
+        f"[0:v]ass='{safe_ass_path}'[v];{audio_filter}",
         "-map",
         "[v]",
         "-map",
@@ -834,6 +852,28 @@ def _mux_combat_commentary_video(*, clip_path: str, ass_path: str, audio_path: s
             f"  Commentary mux failed: {result.stderr.decode('utf-8', errors='replace')[:300]}",
             fg="yellow",
         )
+
+
+def _video_has_audio_stream(video_path: str) -> bool:
+    import subprocess
+
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "csv=p=0",
+        video_path,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except Exception:
+        return False
+    return result.returncode == 0 and "audio" in result.stdout
 
 
 def _highlight_tags(highlight) -> set[str]:
