@@ -78,7 +78,16 @@ class RemixerPage(QWidget):
         lbl_lang = QLabel("Commentary Language:")
         lbl_lang.setStyleSheet("color: #94A3B8; margin-top: 10px;")
         self.cmb_lang = QComboBox()
-        self.cmb_lang.addItems(["Vietnamese", "English", "Chinese", "Japanese", "Korean", "Spanish"])
+        self.cmb_lang.addItems([
+            "Viet Nam",
+            "Hoa Ky (My)",
+            "Vuong quoc Anh (Anh)",
+            "Phap",
+            "Duc",
+            "Nhat Ban",
+            "Han Quoc",
+            "Brazil",
+        ])
         self.cmb_lang.setCurrentText(self._get_language_full_name(self._config.voiceover.commentary.language))
         self.cmb_lang.setStyleSheet("padding: 5px; background: #0F172A; color: white; border: 1px solid #334155;")
         
@@ -298,11 +307,35 @@ class RemixerPage(QWidget):
         self.txt_script.append(f"\n❌ Lỗi: {error_tuple[1]}")
 
     def _get_language_full_name(self, code: str) -> str:
-        mapping = {"vi": "Vietnamese", "en": "English", "zh": "Chinese", "ja": "Japanese", "ko": "Korean", "es": "Spanish"}
-        return mapping.get(code, "Vietnamese")
+        mapping = {
+            "vi": "Viet Nam",
+            "en": "Hoa Ky (My)",
+            "en-US": "Hoa Ky (My)",
+            "en-GB": "Vuong quoc Anh (Anh)",
+            "fr": "Phap",
+            "fr-FR": "Phap",
+            "de": "Duc",
+            "de-DE": "Duc",
+            "ja": "Nhat Ban",
+            "ja-JP": "Nhat Ban",
+            "ko": "Han Quoc",
+            "ko-KR": "Han Quoc",
+            "pt": "Brazil",
+            "pt-BR": "Brazil",
+        }
+        return mapping.get(code, "Viet Nam")
 
     def _get_language_code(self, name: str) -> str:
-        mapping = {"Vietnamese": "vi", "English": "en", "Chinese": "zh", "Japanese": "ja", "Korean": "ko", "Spanish": "es"}
+        mapping = {
+            "Viet Nam": "vi",
+            "Hoa Ky (My)": "en-US",
+            "Vuong quoc Anh (Anh)": "en-GB",
+            "Phap": "fr-FR",
+            "Duc": "de-DE",
+            "Nhat Ban": "ja-JP",
+            "Han Quoc": "ko-KR",
+            "Brazil": "pt-BR",
+        }
         return mapping.get(name, "vi")
 
     def _get_style_full_name(self, style_id: str) -> str:

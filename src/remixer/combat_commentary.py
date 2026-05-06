@@ -41,6 +41,69 @@ SAFE_LINES = {
         "api_semantic": "This is the key moment to watch.",
         "default": "This moment can shift the fight quickly.",
     },
+    "en-US": {
+        "impact": "That strike changes the pressure immediately.",
+        "submission": "That submission threat forces a quick reaction.",
+        "scramble": "This scramble can swing the whole exchange.",
+        "motion": "The pace jumps fast in this moment.",
+        "crowd_audio": "The crowd reacts hard to this sequence.",
+        "api_semantic": "This is the key moment to watch.",
+        "default": "This moment can shift the fight quickly.",
+    },
+    "en-GB": {
+        "impact": "That strike shifts the pressure straight away.",
+        "submission": "That submission threat forces an immediate response.",
+        "scramble": "This scramble can turn the whole exchange.",
+        "motion": "The pace rises sharply in this moment.",
+        "crowd_audio": "The crowd reacts strongly to this sequence.",
+        "api_semantic": "This is the key moment to watch.",
+        "default": "This moment can change the fight quickly.",
+    },
+    "fr-FR": {
+        "impact": "Cette frappe met la pression immediatement.",
+        "submission": "Cette menace de soumission force une reaction rapide.",
+        "scramble": "Cette lutte au contact peut inverser l'echange.",
+        "motion": "Le rythme monte tres vite sur cette action.",
+        "crowd_audio": "Le public reagit fort a cette sequence.",
+        "api_semantic": "C'est le moment cle a regarder.",
+        "default": "Ce moment peut changer le combat rapidement.",
+    },
+    "de-DE": {
+        "impact": "Dieser Treffer erhoeht sofort den Druck.",
+        "submission": "Diese Submission-Gefahr erzwingt eine schnelle Reaktion.",
+        "scramble": "Dieses Gerangel kann den Austausch kippen.",
+        "motion": "Das Tempo steigt in diesem Moment stark an.",
+        "crowd_audio": "Das Publikum reagiert stark auf diese Sequenz.",
+        "api_semantic": "Das ist der entscheidende Moment.",
+        "default": "Dieser Moment kann den Kampf schnell drehen.",
+    },
+    "ja-JP": {
+        "impact": "この一撃で一気に流れが変わります。",
+        "submission": "このサブミッションの圧力で即座の対応が必要です。",
+        "scramble": "この攻防で展開が大きく動きます。",
+        "motion": "ここで一気にテンポが上がります。",
+        "crowd_audio": "観客がこの場面に大きく反応しています。",
+        "api_semantic": "ここが注目すべきポイントです。",
+        "default": "この瞬間が試合の流れを変えます。",
+    },
+    "ko-KR": {
+        "impact": "이 타격이 곧바로 압박을 만듭니다.",
+        "submission": "이 서브미션 위협은 빠른 대응을 강요합니다.",
+        "scramble": "이 공방이 흐름을 크게 바꿀 수 있습니다.",
+        "motion": "이 순간 속도가 빠르게 올라갑니다.",
+        "crowd_audio": "관중이 이 장면에 강하게 반응합니다.",
+        "api_semantic": "지금이 꼭 봐야 할 핵심 순간입니다.",
+        "default": "이 순간이 경기 흐름을 빠르게 바꿉니다.",
+    },
+    "pt-BR": {
+        "impact": "Esse golpe muda a pressao imediatamente.",
+        "submission": "Essa ameaca de finalizacao exige resposta rapida.",
+        "scramble": "Essa disputa pode virar toda a troca.",
+        "motion": "O ritmo sobe muito rapido nesse momento.",
+        "crowd_audio": "A torcida reage forte a essa sequencia.",
+        "api_semantic": "Esse e o momento chave para observar.",
+        "default": "Esse momento pode mudar a luta rapidamente.",
+    },
 }
 
 IMPACT_KEYWORDS = ("gục", "knockout", "knockdown", "đòn", "strike", "siết", "ngã", "áp lực", "pressure")
@@ -256,7 +319,7 @@ def unsupported_claims(text: str, packet: CombatEvidencePacket) -> list[str]:
 
 def fallback_segment(packet: CombatEvidencePacket) -> CommentarySegment:
     primary = _primary_signal(packet)
-    lines = SAFE_LINES.get(packet.language, SAFE_LINES["vi"])
+    lines = SAFE_LINES.get(_language_key(packet.language), SAFE_LINES["vi"])
     text = lines.get(primary, lines["default"])
     start = max(0.0, packet.hook_time - packet.start_time - 0.25)
     return CommentarySegment(
@@ -322,9 +385,30 @@ def _normalize(text: str) -> str:
 def _language_name(code: str) -> str:
     return {
         "vi": "Vietnamese",
-        "en": "English",
+        "en": "American English",
+        "en-US": "American English",
+        "en-GB": "British English",
         "zh": "Chinese",
+        "fr": "French",
+        "fr-FR": "French",
+        "de": "German",
+        "de-DE": "German",
         "ja": "Japanese",
+        "ja-JP": "Japanese",
         "ko": "Korean",
+        "ko-KR": "Korean",
+        "pt": "Brazilian Portuguese",
+        "pt-BR": "Brazilian Portuguese",
         "es": "Spanish",
     }.get(code, code or "Vietnamese")
+
+
+def _language_key(code: str) -> str:
+    return {
+        "en": "en-US",
+        "fr": "fr-FR",
+        "de": "de-DE",
+        "ja": "ja-JP",
+        "ko": "ko-KR",
+        "pt": "pt-BR",
+    }.get(code, code or "vi")

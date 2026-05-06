@@ -172,6 +172,18 @@ Language selection:
   selected language.
 - `combat-cut --write-commentary` accepts `--commentary-language`, so subtitle
   and commentary assets can be generated in the requested language.
+- Supported country language choices:
+
+| UI choice | Code | Output language / voice |
+| --- | --- | --- |
+| Viet Nam | `vi` | Vietnamese |
+| Hoa Ky (My) | `en-US` | American English |
+| Vuong quoc Anh (Anh) | `en-GB` | British English |
+| Phap | `fr-FR` | French |
+| Duc | `de-DE` | German |
+| Nhat Ban | `ja-JP` | Japanese |
+| Han Quoc | `ko-KR` | Korean |
+| Brazil | `pt-BR` | Brazilian Portuguese |
 
 ## Recommended Prompt Rules
 

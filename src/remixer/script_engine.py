@@ -68,9 +68,19 @@ Return valid JSON:
 def _language_name(code: str) -> str:
     return {
         "vi": "Vietnamese",
-        "en": "English",
+        "en": "American English",
+        "en-US": "American English",
+        "en-GB": "British English",
         "zh": "Chinese",
+        "fr": "French",
+        "fr-FR": "French",
+        "de": "German",
+        "de-DE": "German",
         "ja": "Japanese",
+        "ja-JP": "Japanese",
         "ko": "Korean",
+        "ko-KR": "Korean",
+        "pt": "Brazilian Portuguese",
+        "pt-BR": "Brazilian Portuguese",
         "es": "Spanish",
     }.get(code, code or "Vietnamese")

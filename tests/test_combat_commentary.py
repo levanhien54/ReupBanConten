@@ -73,6 +73,16 @@ async def test_combat_commentary_fallback_uses_selected_language():
     assert "áp lực" not in script.segments[0].text.lower()
 
 
+@pytest.mark.asyncio
+async def test_combat_commentary_fallback_supports_country_language_code():
+    generator = CombatCommentaryGenerator()
+
+    script = await generator.generate_script([_highlight()], language="pt-BR")
+
+    assert len(script.segments) == 1
+    assert "golpe" in script.segments[0].text.lower()
+
+
 def test_unsupported_claims_allow_supported_knockdown_transcript():
     transcript = TranscriptResult(
         full_text="",

@@ -13,6 +13,26 @@ from src.core.types import CommentaryScript, CommentarySegment
 logger = get_logger(__name__)
 
 
+EDGE_TTS_VOICES = {
+    "vi": "vi-VN-HoaiMyNeural",
+    "en": "en-US-EmmaNeural",
+    "en-US": "en-US-EmmaNeural",
+    "en-GB": "en-GB-SoniaNeural",
+    "fr": "fr-FR-DeniseNeural",
+    "fr-FR": "fr-FR-DeniseNeural",
+    "de": "de-DE-KatjaNeural",
+    "de-DE": "de-DE-KatjaNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "ja-JP": "ja-JP-NanamiNeural",
+    "ko": "ko-KR-SunHiNeural",
+    "ko-KR": "ko-KR-SunHiNeural",
+    "pt": "pt-BR-FranciscaNeural",
+    "pt-BR": "pt-BR-FranciscaNeural",
+    "es": "es-ES-ElviraNeural",
+}
+
+
 class VoiceoverEngine:
     """Công cụ tạo giọng nói AI từ kịch bản."""
 
@@ -112,16 +132,7 @@ class VoiceoverEngine:
         import edge_tts
         
         # Bản đồ ngôn ngữ sang giọng nói Edge-TTS mặc định
-        voice_map = {
-            "vi": "vi-VN-HoaiMyNeural",
-            "en": "en-US-EmmaNeural",
-            "zh": "zh-CN-XiaoxiaoNeural",
-            "ja": "ja-JP-NanamiNeural",
-            "ko": "ko-KR-SunHiNeural",
-            "es": "es-ES-ElviraNeural"
-        }
-        
-        voice = voice_map.get(lang, "vi-VN-HoaiMyNeural")
+        voice = EDGE_TTS_VOICES.get(lang, EDGE_TTS_VOICES["vi"])
         
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_path)
