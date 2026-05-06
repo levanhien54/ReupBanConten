@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QListWidget, QListWidgetItem, QTextEdit, 
     QSplitter, QFrame, QSpinBox, QCheckBox, QComboBox,
-    QLineEdit, QGroupBox, QFormLayout
+    QLineEdit, QGroupBox, QFormLayout, QScrollArea
 )
 
 from typing import Optional, List
@@ -120,6 +120,8 @@ class RemixerPage(QWidget):
         left_layout.addWidget(lbl_folders)
         
         self.list_folders = QListWidget()
+        self.list_folders.setMinimumHeight(72)
+        self.list_folders.setMaximumHeight(150)
         self.list_folders.setStyleSheet("""
             QListWidget { background: #0F172A; border: 1px solid #334155; border-radius: 4px; color: #F8FAFC; }
             QListWidget::item { padding: 8px; border-bottom: 1px solid #1E293B; }
@@ -132,7 +134,13 @@ class RemixerPage(QWidget):
         self.btn_remix.setStyleSheet("background: #10B981; color: white; padding: 12px; font-weight: bold; border-radius: 4px;")
         left_layout.addWidget(self.btn_remix)
         
-        splitter.addWidget(left_frame)
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        left_scroll.setWidget(left_frame)
+        splitter.addWidget(left_scroll)
         
         # Cột Phải: Logs / Script Preview
         right_frame = QFrame()
@@ -149,7 +157,7 @@ class RemixerPage(QWidget):
         right_layout.addWidget(self.txt_script)
         
         splitter.addWidget(right_frame)
-        splitter.setSizes([350, 450])
+        splitter.setSizes([420, 620])
         layout.addWidget(splitter)
         
         self._load_mock_folders()
@@ -165,6 +173,7 @@ class RemixerPage(QWidget):
 
     def _build_subtitle_editor_group(self) -> QGroupBox:
         group = QGroupBox("Subtitle Editor")
+        group.setMinimumHeight(270)
         group.setStyleSheet("""
             QGroupBox {
                 color: #3B82F6; font-weight: bold;
@@ -208,7 +217,8 @@ class RemixerPage(QWidget):
         self.chk_word_highlight.setChecked(subtitle_cfg.word_highlight)
 
         self.txt_subtitle_preview = QTextEdit()
-        self.txt_subtitle_preview.setMaximumHeight(70)
+        self.txt_subtitle_preview.setMinimumHeight(64)
+        self.txt_subtitle_preview.setMaximumHeight(90)
         self.txt_subtitle_preview.setPlainText("Cú ra đòn này tạo áp lực ngay lập tức.")
 
         for widget in (
