@@ -170,6 +170,26 @@ class KeyMoment(BaseModel):
     is_highlight: bool = False
 
 
+class CombatSignal(BaseModel):
+    """Raw signal used to rank a combat-sports highlight."""
+    time: float
+    score: float
+    kind: str
+    reason: str = ""
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+
+
+class CombatHighlight(BaseModel):
+    """Ranked candidate for a short combat-sports hook clip."""
+    start_time: float
+    end_time: float
+    hook_time: float
+    score: float
+    reasons: list[str] = Field(default_factory=list)
+    signals: list[CombatSignal] = Field(default_factory=list)
+
+
 class AnalysisResult(BaseModel):
     """Kết quả phân tích LLM."""
     topics: list[str] = Field(default_factory=list)
