@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Data (large files)
+data/downloads/
+data/clips/
+data/outputs/
+data/cache/
+data/thumbnails/
+data/transcripts/
+*.mp4
+*.mp3
+*.wav
+*.webm
+*.mkv
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Vector/runtime artifacts
+data/tests/
+data/**/*.bin
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.spec

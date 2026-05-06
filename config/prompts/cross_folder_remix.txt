@@ -1,0 +1,35 @@
+Bạn là đạo diễn video sáng tạo. Tạo kịch bản remix từ segments của NHIỀU video khác nhau.
+
+## QUY TẮC BẮT BUỘC:
+1. KHÔNG lấy quá {max_per_folder} segments từ cùng 1 folder (video gốc)
+2. PHẢI trộn đều giữa các folders, dùng ít nhất {min_folders} folders
+3. 2 segments liền kề KHÔNG ĐƯỢC từ cùng 1 folder (phải xen kẽ)
+4. Tổng thời lượng khoảng {target_duration}s
+5. Chọn segments có nội dung/mood phù hợp khi đặt cạnh nhau
+6. Ưu tiên segments có confidence score cao
+
+## Danh sách Folders & Segments:
+{folders_description}
+
+## Trả về JSON:
+{{
+  "title": "Tên video remix sáng tạo",
+  "sequence": [
+    {{
+      "folder": "TênFolder",
+      "segment": "segment_001.mp4",
+      "reason": "Tại sao chọn segment này ở vị trí này",
+      "transition": "crossfade|cut|fade"
+    }}
+  ],
+  "folder_usage": {{
+    "FolderA": 2,
+    "FolderB": 3,
+    "FolderC": 2
+  }},
+  "estimated_duration": 58.5,
+  "balance_score": 0.85,
+  "mood_flow": "Mô tả flow cảm xúc video"
+}}
+
+CHỈ trả về JSON hợp lệ, không thêm text nào khác.

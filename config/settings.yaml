@@ -1,0 +1,312 @@
+# ============================================
+# ReupBanConten - Main Configuration
+# ============================================
+
+app:
+  name: "ReupBanConten"
+  version: "0.1.0"
+  description: "AI Video Remix Engine"
+  log_level: "INFO"
+
+# === Phase 1: Download Configuration ===
+downloader:
+  max_concurrent: 3
+  default_quality: "720p"
+  preferred_format: "mp4"
+  filter_shorts_only: true
+  max_video_duration: 180  # seconds (3 minutes)
+  min_video_duration: 10   # seconds
+  max_videos_per_channel: 50
+  
+  # yt-dlp options
+  ytdlp:
+    cookies_file: null     # Path to cookies.txt (for age-restricted)
+    proxy: null            # Proxy URL
+    rate_limit: null       # Download speed limit (e.g., "1M")
+    retries: 3
+    sleep_interval: 2      # Seconds between downloads
+    
+  # Metadata extraction
+  metadata:
+    extract_thumbnail: true
+    extract_subtitles: true
+    subtitle_languages: ["vi", "en"]
+
+# === Phase 2: Analyzer Configuration ===
+analyzer:
+  # Whisper transcription
+  whisper:
+    model: "large-v3"       # tiny, base, small, medium, large-v3
+    device: "cuda"           # cuda or cpu
+    compute_type: "float16"  # float16, int8_float16, int8
+    language: "vi"           # null for auto-detect
+    beam_size: 5
+    vad_filter: true         # Voice Activity Detection
+    word_timestamps: true
+    
+  # Visual analysis (optional)
+  visual:
+    enabled: false
+    model: "blip2"           # blip2 or llava
+    frame_interval: 5        # Extract 1 frame every N seconds
+    max_frames: 20           # Max frames to analyze per video
+    
+  # LLM analysis
+  llm:
+    provider: "ollama"       # ollama, openai, anthropic
+    fallback: ["openai"]
+    model: "llama3"
+    temperature: 0.3         # Lower = more consistent
+    max_tokens: 4096
+    timeout: 120             # seconds
+    
+    # Map-Reduce for long transcripts
+    chunk_size: 3000         # tokens per chunk
+    chunk_overlap: 200       # overlap between chunks
+    
+  # Content classification
+  classifier:
+    categories:
+      - "entertainment"
+      - "education" 
+      - "gaming"
+      - "music"
+      - "comedy"
+      - "lifestyle"
+      - "news"
+      - "tech"
+      - "sports"
+      - "other"
+
+# === Phase 3: Cutter Configuration ===
+cutter:
+  # Scene detection
+  scene_detection:
+    method: "content"        # content, threshold, adaptive
+    threshold: 30.0          # Sensitivity (lower = more scenes)
+    min_scene_length: 2.0    # seconds
+    
+  # Smart clipping
+  clipping:
+    min_clip_duration: 2     # seconds
+    max_clip_duration: 5.0   # seconds (Cập nhật theo yêu cầu người dùng)
+    highlight_threshold: 0.7 # Minimum highlight score (0-1)
+    
+  # Clip tagging
+  tagging:
+    auto_tag: true
+    tag_categories:
+      mood: ["happy", "sad", "exciting", "calm", "funny", "dramatic"]
+      energy: ["low", "medium", "high", "peak"]
+      content_type: ["dialogue", "action", "reaction", "transition", "intro", "outro"]
+
+# === Phase 4: Remixer Configuration ===
+remixer:
+  # Remix strategies
+  default_strategy: "energy-flow"
+  strategies:
+    - "topic-based"      # Group clips by topic
+    - "energy-flow"      # Low → High → Low energy flow
+    - "narrative"        # LLM creates a story
+    - "random-creative"  # Random with creative transitions
+    - "best-of"          # Top highlights only
+    - "chronological"    # Time-ordered
+    
+  # Output settings
+  output:
+    default_duration: 60   # seconds
+    min_duration: 15
+    max_duration: 300
+    fps: 30
+    resolution: "1080x1920"  # 9:16 for Shorts
+    codec: "libx264"
+    audio_codec: "aac"
+    audio_bitrate: "192k"
+    video_bitrate: "5M"
+    hardware_acceleration: "auto" # auto, nvenc, qsv, videotoolbox, none
+    
+  # Effects
+  effects:
+    transitions:
+      enabled: true
+      default_type: "crossfade"  # crossfade, fade, slide, zoom, cut
+      duration: 0.2              # seconds (Rút ngắn cho nhịp độ 5s)
+    
+    subtitles:
+      enabled: true
+      font: "Arial"
+      font_size: 40
+      color: "white"
+      outline_color: "black"
+      outline_width: 2
+      position: "bottom"        # top, center, bottom
+      word_highlight: true      # Highlight current word
+      
+    speed_ramp:
+      enabled: false
+      slow_factor: 0.5
+      fast_factor: 1.5
+      
+    background_music:
+      enabled: false
+      volume: 0.15             # Relative to original audio
+      fade_in: 2.0             # seconds
+      fade_out: 2.0
+      
+    color_grading:
+      enabled: false
+      preset: "vibrant"        # vibrant, warm, cool, cinematic, vintage
+
+  # Transformation (to ensure "new" content)
+  transformation:
+    change_order: true
+    add_subtitles: true
+    add_transitions: true
+    speed_variation: false
+    color_shift: false
+    crop_variation: false
+    add_voiceover: true         # Bật voiceover bằng ElevenLabs
+    
+  # Smart Crop (Face/Subject Tracking cho 9:16)
+  smart_crop:
+    enabled: true
+    method: "face_tracking"     # face_tracking, center, random
+    smoothness: 15              # Khung hình để làm mượt chuyển động crop (tránh giật)
+    detection_fps: 2            # Scan N frames mỗi giây để tìm mặt (tối ưu tốc độ)
+
+# === Phase 2.5: Emotion Filter (PRE-LLM) ===
+emotion_filter:
+  enabled: true
+  flatness_threshold: 0.6      # 0.0-1.0 (cao hơn = strict, loại nhiều hơn)
+  segment_duration: 3.0         # Chia video thành chunks N giây để phân tích
+  use_speech_emotion: false     # Dùng ML classifier (chậm hơn, chính xác hơn)
+  
+  # Feature weights (tổng = 1.0)
+  weights:
+    pitch_variance: 0.30        # Giọng monotone = quan trọng nhất
+    energy_dynamic: 0.25        # Năng lượng không đổi
+    spectral_change: 0.15       # Âm sắc không đổi
+    silence: 0.15               # Quá nhiều im lặng
+    onset_density: 0.15         # Ít thay đổi nhịp
+  
+  # Thresholds cho từng feature
+  thresholds:
+    pitch_variance_low: 0.05    # Pitch std/mean < 0.05 = monotone
+    energy_dynamic_low: 5.0     # Dynamic range < 5dB = flat
+    silence_high: 0.6           # > 60% im lặng = skip
+    onset_density_low: 0.5      # Onset quá thưa
+
+# === Phase 4.5: Voiceover Configuration ===
+voiceover:
+  enabled: true
+  provider: "elevenlabs"        # elevenlabs hoặc edge-tts (free fallback)
+  
+  elevenlabs:
+    model: "eleven_multilingual_v2"  # Hỗ trợ tiếng Việt
+    default_voice: null         # Auto-select nếu null
+    stability: 0.5              # 0.0-1.0
+    similarity_boost: 0.75      # 0.0-1.0
+    style: 0.5                  # 0.0-1.0
+    speed: 1.0                  # 0.5-2.0
+    
+  edge_tts_fallback:
+    voice_vi: "vi-VN-NamMinhNeural"
+    voice_vi_female: "vi-VN-HoaiMyNeural"
+    voice_en: "en-US-GuyNeural"
+    voice_en_female: "en-US-JennyNeural"
+    
+  mixing:
+    original_volume_during_vo: 0.3   # Duck audio gốc khi có voiceover
+    voiceover_volume: 1.0
+    fade_in: 0.2                     # Fade in voiceover (giây)
+    fade_out: 0.2                    # Fade out voiceover (giây)
+    
+  commentary:
+    language: "vi"
+    max_segments: 8             # Tối đa N đoạn bình luận
+    min_gap_between: 3.0        # Giây tối thiểu giữa 2 đoạn
+    style: "entertaining"       # entertaining, educational, dramatic
+
+# === Phase 3+: Precise Scene Detection ===
+scene_detection_precise:
+  content_threshold: 27.0       # PySceneDetect content detector
+  adaptive_threshold: 3.5       # PySceneDetect adaptive detector
+  hist_threshold: 0.5           # OpenCV histogram correlation
+  min_scene_len: 1.0            # Giây - scene tối thiểu
+  consensus_tolerance: 0.5      # Giây - merge cuts gần nhau từ nhiều methods
+
+# === Phase 3+: Black Frame & Flash Filter ===
+black_flash_filter:
+  black_threshold: 15.0         # Pixel intensity dưới mức này = đen (0-255)
+  black_ratio: 0.7              # > 70% frames đen trong segment = loại bỏ
+  flash_threshold: 100.0        # Brightness jump > 100 giữa 2 frames = flash
+  min_segment_duration: 0.5     # Segment ngắn hơn 0.5s = loại bỏ
+
+# === Phase 4+: Cross-Folder Remix ===
+cross_folder_remix:
+  max_segments_per_folder: 3    # Không lấy quá N segments từ 1 folder
+  min_folders_used: 3           # Phải dùng ít nhất N folders khác nhau
+  no_adjacent_same_folder: true # 2 segments liền kề không cùng folder
+  segments_base_dir: "./data/segments"
+
+# === Phase 5: Meme Effects ===
+meme_effects:
+  enabled: true
+  assets_dir: "./data/meme_assets"
+  max_memes_per_video: 8        # Tối đa N memes trong 1 video
+  min_gap_between_memes: 3.0    # Giây tối thiểu giữa 2 memes
+  auto_download_starter: true   # Tự động tải starter pack lần đầu
+  
+  sounds:
+    default_volume: 0.7          # 0.0-1.0
+    duck_original: true          # Giảm audio gốc khi có SFX
+    duck_volume: 0.4             # Volume audio gốc khi duck
+    
+  images:
+    default_size_ratio: 0.25     # 25% kích thước video
+    default_duration: 2.0        # Giây hiển thị
+    default_position: "bottom_right"
+    fade_in: 0.2
+    fade_out: 0.3
+
+# === Phase 1: Preprocessor Configuration ===
+preprocessor:
+  enabled: true
+  resolution: 720
+  fps: 20
+  crf: 23
+  chunk_size: 65536
+  
+  # Smart pre-cut settings
+  silence_threshold: -40.0      # dB (âm thanh dưới mức này là im lặng)
+  min_silence_len: 0.5          # giây
+  remove_black_frames: true
+  black_threshold: 0.05         # tỷ lệ pixels đen để coi là frame đen
+
+
+# === Database ===
+database:
+  provider: "sqlite"            # sqlite hoặc postgres
+  path: "./data/reupbanconten.db"
+  
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "your-password"
+    dbname: "reup_ban_conten"
+  
+# === Storage Paths ===
+storage:
+  base_dir: "./data"
+  downloads: "./data/downloads"
+  clips: "./data/clips"
+  segments: "./data/segments"
+  outputs: "./data/outputs"
+  cache: "./data/cache"
+  thumbnails: "./data/thumbnails"
+  transcripts: "./data/transcripts"
+  voiceovers: "./data/voiceovers"
+  meme_assets: "./data/meme_assets"
+  logs: "./logs"
+

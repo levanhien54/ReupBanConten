@@ -1,0 +1,39 @@
+Bạn là chuyên gia phân tích nội dung video. Phân tích transcript sau đây và trả về JSON.
+
+## Transcript:
+{transcript}
+
+## Metadata:
+- Tiêu đề: {title}
+- Mô tả: {description}
+- Thời lượng: {duration}s
+
+## Yêu cầu phân tích:
+1. Xác định các chủ đề chính
+2. Đánh giá mood/cảm xúc tổng thể
+3. Phân loại nội dung
+4. Tìm các "key moments" - đoạn hay nhất
+5. Chấm điểm energy và viral potential
+
+## Trả về JSON với cấu trúc chính xác sau:
+{{
+  "topics": ["chủ đề 1", "chủ đề 2"],
+  "mood": "happy|sad|exciting|calm|funny|dramatic|neutral",
+  "category": "entertainment|education|gaming|music|comedy|lifestyle|news|tech|sports|other",
+  "summary": "Tóm tắt nội dung trong 2-3 câu",
+  "language": "vi|en|other",
+  "has_speech": true,
+  "key_moments": [
+    {{
+      "start_time": 0.0,
+      "end_time": 10.5,
+      "description": "Mô tả ngắn đoạn này",
+      "energy_score": 0.8,
+      "is_highlight": true
+    }}
+  ],
+  "overall_energy": 0.7,
+  "viral_potential": 0.6
+}}
+
+CHỈ trả về JSON hợp lệ, không thêm text hay giải thích nào khác.

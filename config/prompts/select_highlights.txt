@@ -1,0 +1,34 @@
+Bạn là editor video chuyên nghiệp. Dựa trên phân tích sau, chọn các đoạn HAY NHẤT để cắt thành clips ngắn.
+
+## Phân tích video:
+{analysis_json}
+
+## Transcript có timestamp:
+{timestamped_transcript}
+
+## Quy tắc cắt:
+- Mỗi clip tối thiểu {min_duration}s, tối đa {max_duration}s
+- Ưu tiên đoạn có energy score cao, nội dung hấp dẫn
+- TRÁNH cắt giữa câu nói - chọn điểm cắt tự nhiên (pause, chuyển cảnh)
+- Chọn tối đa {max_clips} clips
+- Mỗi clip phải có thể đứng độc lập (có ý nghĩa riêng)
+
+## Trả về JSON:
+{{
+  "clips": [
+    {{
+      "start_time": 5.2,
+      "end_time": 18.7,
+      "reason": "Giải thích ngắn gọn tại sao chọn đoạn này",
+      "highlight_score": 0.95,
+      "tags": ["exciting", "peak", "action"],
+      "mood": "exciting",
+      "energy_level": "peak",
+      "content_type": "action"
+    }}
+  ],
+  "total_clips": 5,
+  "coverage_percent": 65.0
+}}
+
+CHỈ trả về JSON hợp lệ, không thêm text nào khác.
