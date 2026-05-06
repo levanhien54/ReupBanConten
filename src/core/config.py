@@ -154,6 +154,8 @@ class SubtitleConfig(BaseModel):
     word_highlight: bool = True
     highlight_color: str = "white"
     preset_style: str = "capcut_yellow" # capcut_yellow, modern_white, glow_pink
+    effect: str = "impact_pop" # none, fade, impact_pop, replay_fade
+    max_chars_per_line: int = 24
 
 
 class OutputConfig(BaseModel):

@@ -322,6 +322,10 @@ class CommentarySegment(BaseModel):
     duration_estimate: float = 3.0
     emotion: str = "neutral"
     audio_path: Optional[str] = None
+    evidence_used: list[str] = Field(default_factory=list)
+    certainty: str = "medium"
+    style: str = "setup"
+    keywords: list[str] = Field(default_factory=list)
 
 
 class CommentaryScript(BaseModel):

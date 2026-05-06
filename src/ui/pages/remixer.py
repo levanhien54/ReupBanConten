@@ -7,7 +7,8 @@ from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QListWidget, QListWidgetItem, QTextEdit, 
-    QSplitter, QFrame, QSpinBox, QCheckBox, QComboBox
+    QSplitter, QFrame, QSpinBox, QCheckBox, QComboBox,
+    QLineEdit, QGroupBox, QFormLayout
 )
 
 from typing import Optional, List
@@ -69,6 +70,10 @@ class RemixerPage(QWidget):
         self.chk_voice = QCheckBox("Add AI Voiceover")
         self.chk_voice.setChecked(self._config.voiceover.enabled)
         self.chk_voice.setStyleSheet("color: #94A3B8;")
+
+        self.chk_subtitles = QCheckBox("Burn Subtitles")
+        self.chk_subtitles.setChecked(self._config.remixer.effects.subtitles.enabled)
+        self.chk_subtitles.setStyleSheet("color: #94A3B8;")
         
         lbl_lang = QLabel("Commentary Language:")
         lbl_lang.setStyleSheet("color: #94A3B8; margin-top: 10px;")
@@ -83,6 +88,7 @@ class RemixerPage(QWidget):
         self.cmb_style.addItems(["CapCut Yellow", "Modern White", "Glow Pink", "Elegant Gold", "Neon Cyber"])
         self.cmb_style.setCurrentText(self._get_style_full_name(self._config.remixer.effects.subtitles.preset_style))
         self.cmb_style.setStyleSheet("padding: 5px; background: #0F172A; color: white; border: 1px solid #334155;")
+        subtitle_group = self._build_subtitle_editor_group()
 
         left_layout.addWidget(lbl_dur)
         left_layout.addWidget(self.spn_dur)
@@ -93,10 +99,12 @@ class RemixerPage(QWidget):
         left_layout.addSpacing(10)
         left_layout.addWidget(self.chk_meme)
         left_layout.addWidget(self.chk_voice)
+        left_layout.addWidget(self.chk_subtitles)
         left_layout.addWidget(lbl_lang)
         left_layout.addWidget(self.cmb_lang)
         left_layout.addWidget(lbl_style)
         left_layout.addWidget(self.cmb_style)
+        left_layout.addWidget(subtitle_group)
         left_layout.addSpacing(20)
         
         # 2. Source Folders
@@ -139,6 +147,81 @@ class RemixerPage(QWidget):
         
         self._load_mock_folders()
 
+    def _build_subtitle_editor_group(self) -> QGroupBox:
+        group = QGroupBox("Subtitle Editor")
+        group.setStyleSheet("""
+            QGroupBox {
+                color: #3B82F6; font-weight: bold;
+                border: 1px solid #334155; border-radius: 6px;
+                margin-top: 10px; padding: 10px;
+            }
+            QGroupBox::title { subcontrol-origin: margin; left: 10px; }
+            QLabel { color: #94A3B8; }
+            QLineEdit, QComboBox, QSpinBox {
+                padding: 5px; background: #0F172A; color: white;
+                border: 1px solid #334155; border-radius: 4px;
+            }
+            QCheckBox { color: #94A3B8; }
+        """)
+        form = QFormLayout(group)
+        form.setSpacing(8)
+        subtitle_cfg = self._config.remixer.effects.subtitles
+
+        self.txt_subtitle_font = QLineEdit(subtitle_cfg.font)
+        self.spn_subtitle_size = QSpinBox()
+        self.spn_subtitle_size.setRange(18, 120)
+        self.spn_subtitle_size.setValue(subtitle_cfg.font_size)
+
+        self.cmb_subtitle_position = QComboBox()
+        self.cmb_subtitle_position.addItems(["Bottom", "Center", "Top"])
+        self.cmb_subtitle_position.setCurrentText(subtitle_cfg.position.title())
+
+        self.cmb_subtitle_effect = QComboBox()
+        self.cmb_subtitle_effect.addItems(["Impact Pop", "Fade", "Replay Fade", "None"])
+        self.cmb_subtitle_effect.setCurrentText(self._get_effect_full_name(subtitle_cfg.effect))
+
+        self.spn_subtitle_outline = QSpinBox()
+        self.spn_subtitle_outline.setRange(0, 8)
+        self.spn_subtitle_outline.setValue(subtitle_cfg.outline_width)
+
+        self.spn_chars_per_line = QSpinBox()
+        self.spn_chars_per_line.setRange(12, 42)
+        self.spn_chars_per_line.setValue(subtitle_cfg.max_chars_per_line)
+
+        self.chk_word_highlight = QCheckBox("Highlight action keywords")
+        self.chk_word_highlight.setChecked(subtitle_cfg.word_highlight)
+
+        self.txt_subtitle_preview = QTextEdit()
+        self.txt_subtitle_preview.setMaximumHeight(70)
+        self.txt_subtitle_preview.setPlainText("Cú ra đòn này tạo áp lực ngay lập tức.")
+
+        for widget in (
+            self.txt_subtitle_font,
+            self.spn_subtitle_size,
+            self.cmb_subtitle_position,
+            self.cmb_subtitle_effect,
+            self.spn_subtitle_outline,
+            self.spn_chars_per_line,
+        ):
+            if hasattr(widget, "currentTextChanged"):
+                widget.currentTextChanged.connect(self._update_subtitle_preview)
+            if hasattr(widget, "valueChanged"):
+                widget.valueChanged.connect(self._update_subtitle_preview)
+            if hasattr(widget, "textChanged"):
+                widget.textChanged.connect(self._update_subtitle_preview)
+        self.chk_word_highlight.toggled.connect(self._update_subtitle_preview)
+
+        form.addRow("Font:", self.txt_subtitle_font)
+        form.addRow("Size:", self.spn_subtitle_size)
+        form.addRow("Position:", self.cmb_subtitle_position)
+        form.addRow("Effect:", self.cmb_subtitle_effect)
+        form.addRow("Outline:", self.spn_subtitle_outline)
+        form.addRow("Line width:", self.spn_chars_per_line)
+        form.addRow(self.chk_word_highlight)
+        form.addRow("Preview:", self.txt_subtitle_preview)
+        self._update_subtitle_preview()
+        return group
+
     def _load_mock_folders(self) -> None:
         """Scan danh sách folder thực tế từ data/clips."""
         self.list_folders.clear()
@@ -179,6 +262,7 @@ class RemixerPage(QWidget):
         # Lấy cấu hình từ UI
         lang_code = self._get_language_code(self.cmb_lang.currentText())
         style_id = self._get_style_id(self.cmb_style.currentText())
+        self._apply_subtitle_ui_to_config(style_id)
         
         worker = Worker(self._run_real_remix, is_v2, topic, self.spn_dur.value(), lang_code, style_id)
         worker.signals.result.connect(self._on_remix_done)
@@ -227,6 +311,46 @@ class RemixerPage(QWidget):
     def _get_style_id(self, name: str) -> str:
         mapping = {"CapCut Yellow": "capcut_yellow", "Modern White": "modern_white", "Glow Pink": "glow_pink", "Elegant Gold": "elegant_gold", "Neon Cyber": "neon_cyber"}
         return mapping.get(name, "capcut_yellow")
+
+    def _get_effect_full_name(self, effect_id: str) -> str:
+        mapping = {"impact_pop": "Impact Pop", "fade": "Fade", "replay_fade": "Replay Fade", "none": "None"}
+        return mapping.get(effect_id, "Impact Pop")
+
+    def _get_effect_id(self, name: str) -> str:
+        mapping = {"Impact Pop": "impact_pop", "Fade": "fade", "Replay Fade": "replay_fade", "None": "none"}
+        return mapping.get(name, "impact_pop")
+
+    def _apply_subtitle_ui_to_config(self, style_id: str) -> None:
+        subtitle_cfg = self._config.remixer.effects.subtitles
+        subtitle_cfg.enabled = self.chk_subtitles.isChecked()
+        subtitle_cfg.preset_style = style_id
+        subtitle_cfg.font = self.txt_subtitle_font.text().strip() or "Arial"
+        subtitle_cfg.font_size = self.spn_subtitle_size.value()
+        subtitle_cfg.position = self.cmb_subtitle_position.currentText().lower()
+        subtitle_cfg.effect = self._get_effect_id(self.cmb_subtitle_effect.currentText())
+        subtitle_cfg.outline_width = self.spn_subtitle_outline.value()
+        subtitle_cfg.max_chars_per_line = self.spn_chars_per_line.value()
+        subtitle_cfg.word_highlight = self.chk_word_highlight.isChecked()
+
+    def _update_subtitle_preview(self) -> None:
+        if not hasattr(self, "txt_subtitle_preview"):
+            return
+        font = self.txt_subtitle_font.text().strip() or "Arial"
+        size = self.spn_subtitle_size.value()
+        style = self._get_style_id(self.cmb_style.currentText()) if hasattr(self, "cmb_style") else "capcut_yellow"
+        color = {
+            "capcut_yellow": "#FACC15",
+            "modern_white": "#F8FAFC",
+            "glow_pink": "#FF4FD8",
+            "elegant_gold": "#FBBF24",
+            "neon_cyber": "#22D3EE",
+        }.get(style, "#FACC15")
+        border = "#EF4444" if self.cmb_subtitle_effect.currentText() == "Impact Pop" else "#334155"
+        self.txt_subtitle_preview.setStyleSheet(
+            f"background: #0F172A; color: {color}; border: 2px solid {border}; "
+            f"font-family: {font}; font-size: {max(12, min(30, int(size / 2)))}px; "
+            "font-weight: bold; border-radius: 4px;"
+        )
 
     def _on_remix_done(self, output_path: str) -> None:
         self.txt_script.append("✅ Video Generated Successfully!\n")

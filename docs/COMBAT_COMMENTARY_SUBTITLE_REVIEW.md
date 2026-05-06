@@ -167,6 +167,36 @@ Technical requirements:
 - Support keyword coloring for words like `gục`, `knockout`, `siết`, `đòn`, `ngã`.
 - Use word timestamps when available; otherwise estimate by syllable count.
 
+## Subtitle Editing UI
+
+The Remix page now follows the same user-facing idea as CapCut-style caption
+editing: the user can apply a subtitle style globally, then tune the important
+visual controls before rendering.
+
+Available controls:
+
+- enable or disable subtitle burn-in,
+- choose preset: `CapCut Yellow`, `Modern White`, `Glow Pink`, `Elegant Gold`,
+  `Neon Cyber`,
+- edit font family,
+- edit font size,
+- choose position: bottom, center, top,
+- choose effect: impact pop, fade, replay fade, none,
+- edit outline width,
+- edit max characters per line,
+- enable or disable action keyword highlighting,
+- preview the subtitle look inside the UI.
+
+This does not copy CapCut. It applies the same workflow pattern: editable text
+style, clear presets, position controls, and short-form caption effects.
+
+Reference notes checked during implementation:
+
+- CapCut-style caption workflows commonly generate captions first, then let the
+  user edit text blocks and apply font/size/color/style changes globally.
+- Caption panels commonly expose style, animation/effect, and layout controls.
+- Batch/apply-to-all styling is important so Shorts subtitles stay consistent.
+
 ## Transition Effects Standard
 
 Combat sports should avoid decorative transitions that hide the action.

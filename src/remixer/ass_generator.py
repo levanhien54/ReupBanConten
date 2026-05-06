@@ -1,90 +1,140 @@
-"""
-ASS Subtitle Generator — Tạo file phụ đề .ass chuyên nghiệp.
-Hỗ trợ các hiệu ứng CapCut style thông qua định dạng Advanced Substation Alpha.
-"""
+"""ASS subtitle generator with short-form caption effects."""
+from __future__ import annotations
+
 import os
-from typing import Optional
-from src.core.types import CommentaryScript, CommentarySegment
+import re
+import textwrap
+
 from src.core.config import SubtitleConfig
+from src.core.types import CommentaryScript, CommentarySegment
+
+
+STYLE_COLORS = {
+    "capcut_yellow": ("&H0000FFFF", "&H00000000"),
+    "modern_white": ("&H00FFFFFF", "&H00222222"),
+    "glow_pink": ("&H00FF00FF", "&H00FFFFFF"),
+    "elegant_gold": ("&H0000D7FF", "&H00141414"),
+    "neon_cyber": ("&H00FFFF00", "&H00FF00AA"),
+}
+
+POSITION_ALIGNMENT = {
+    "bottom": 2,
+    "center": 5,
+    "top": 8,
+}
+
 
 class ASSGenerator:
-    """Tạo file phụ đề .ass với style cao cấp."""
+    """Generate styled .ass subtitles for FFmpeg burn-in."""
 
     def __init__(self, config: SubtitleConfig) -> None:
         self._config = config
 
-    def generate(self, script: CommentaryScript, output_path: str, width: int = 1920, height: int = 1080) -> str:
-        """Sinh file .ass từ kịch bản bình luận."""
-        
-        # 1. Header & Styles
+    def generate(
+        self,
+        script: CommentaryScript,
+        output_path: str,
+        width: int = 1920,
+        height: int = 1080,
+    ) -> str:
         header = self._get_header(width, height)
         styles = self._get_styles()
-        
-        # 2. Events (Dialogues)
-        events = ["[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
-        
-        all_segments = []
-        if script.intro: all_segments.append(script.intro)
-        all_segments.extend(script.segments)
-        if script.outro: all_segments.append(script.outro)
-        
-        for seg in all_segments:
+        events = [
+            "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+        ]
+
+        for seg in _iter_segments(script):
             if not seg.text:
                 continue
-            
             start_str = self._format_time(seg.start_time)
-            end_time = seg.start_time + (seg.duration_estimate if seg.duration_estimate > 0 else 3.0)
-            end_str = self._format_time(end_time)
-            
-            # Escape special characters in text
-            clean_text = seg.text.replace("\n", "\\N")
-            
-            # Thêm hiệu ứng karaoke đơn giản nếu được bật
-            if self._config.word_highlight:
-                # {\\k50} là hiệu ứng karaoke 0.5s cho mỗi từ (giả định)
-                # Đây là bản đơn giản, thực tế cần đồng bộ từ (word-level timestamps)
-                pass
+            duration = seg.duration_estimate if seg.duration_estimate > 0 else 3.0
+            end_str = self._format_time(seg.start_time + duration)
+            clean_text = self._format_segment_text(seg)
+            events.append(
+                f"Dialogue: 0,{start_str},{end_str},PremiumStyle,,0,0,0,,{clean_text}"
+            )
 
-            line = f"Dialogue: 0,{start_str},{end_str},PremiumStyle,,0,0,0,,{clean_text}"
-            events.append(line)
-            
-        content = header + "\n" + styles + "\n" + "\n".join(events)
-        
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(content)
-            
+            f.write(header + "\n" + styles + "\n" + "\n".join(events))
         return output_path
 
-    def _get_header(self, w, h) -> str:
+    def _get_header(self, width: int, height: int) -> str:
         return f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: {w}
-PlayResY: {h}
+PlayResX: {width}
+PlayResY: {height}
 ScaledBorderAndShadow: yes
 """
 
     def _get_styles(self) -> str:
-        # Chuyển đổi màu từ config sang format ASS (&HAA GGRRBB)
-        # Mặc định: Vàng viền đen bóng mờ
-        primary = "&H0000FFFF" # Yellow
-        outline = "&H00000000" # Black
-        shadow = "&H64000000"  # Semi-transparent black
-        
-        if self._config.preset_style == "modern_white":
-            primary = "&H00FFFFFF"
-        elif self._config.preset_style == "glow_pink":
-            primary = "&H00FF00FF"
-            outline = "&H00FFFFFF"
-
+        primary, outline = STYLE_COLORS.get(
+            self._config.preset_style,
+            STYLE_COLORS["capcut_yellow"],
+        )
+        alignment = POSITION_ALIGNMENT.get(self._config.position, 2)
+        margin_v = 110 if self._config.position == "bottom" else 70
+        shadow = "&H64000000"
         return f"""[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: PremiumStyle,{self._config.font},{self._config.font_size},{primary},&H000000FF,{outline},{shadow},1,0,0,0,100,100,0,0,1,{self._config.outline_width},2,2,10,10,60,1
+Style: PremiumStyle,{self._config.font},{self._config.font_size},{primary},&H000000FF,{outline},{shadow},1,0,0,0,100,100,0,0,1,{self._config.outline_width},2,{alignment},80,80,{margin_v},1
 """
 
+    def _format_segment_text(self, seg: CommentarySegment) -> str:
+        text = _wrap_subtitle_text(seg.text, width=self._config.max_chars_per_line)
+        text = _escape_ass(text)
+        if self._config.word_highlight and seg.keywords:
+            text = _highlight_keywords(text, seg.keywords)
+
+        effect = self._config.effect
+        if effect == "impact_pop" and seg.style == "impact":
+            return r"{\fad(50,70)\t(0,160,\fscx112\fscy112)}" + text
+        if effect == "replay_fade" or seg.style == "replay":
+            return r"{\fad(140,180)}" + text
+        if effect == "none":
+            return text
+        return r"{\fad(90,120)}" + text
+
     def _format_time(self, seconds: float) -> str:
-        """Chuyển đổi giây sang format ASS H:MM:SS.cs"""
+        seconds = max(0.0, seconds)
         h = int(seconds // 3600)
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
         cs = int((seconds * 100) % 100)
         return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _iter_segments(script: CommentaryScript) -> list[CommentarySegment]:
+    segments = []
+    if script.intro:
+        segments.append(script.intro)
+    segments.extend(script.segments)
+    if script.outro:
+        segments.append(script.outro)
+    return segments
+
+
+def _wrap_subtitle_text(text: str, width: int = 24) -> str:
+    lines = textwrap.wrap(
+        text.strip(),
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+    if len(lines) <= 2:
+        return "\\N".join(lines)
+    return "\\N".join([lines[0], " ".join(lines[1:])])
+
+
+def _escape_ass(text: str) -> str:
+    return text.replace("{", "").replace("}", "").replace("\n", "\\N")
+
+
+def _highlight_keywords(text: str, keywords: list[str]) -> str:
+    for keyword in sorted(set(keywords), key=len, reverse=True):
+        if not keyword:
+            continue
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        text = pattern.sub(lambda m: r"{\c&H0000FF&}" + m.group(0) + r"{\c}", text)
+    return text
