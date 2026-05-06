@@ -9,6 +9,7 @@ from typing import Optional
 from src.core.logging import get_logger
 from src.core.types import CombatHighlight, CommentaryScript, CommentarySegment, TranscriptResult
 from src.llm.provider import LLMProvider
+from src.remixer.language_registry import canonical_language_code, language_prompt_name
 
 logger = get_logger(__name__)
 
@@ -266,7 +267,7 @@ def build_timeline_evidence(
 
 
 def build_commentary_prompt(packet: CombatEvidencePacket) -> str:
-    language_name = _language_name(packet.language)
+    language_name = language_prompt_name(packet.language)
     return (
         "You are a professional combat-sports commentator.\n"
         "Only comment based on the supplied evidence.\n"
@@ -319,7 +320,7 @@ def unsupported_claims(text: str, packet: CombatEvidencePacket) -> list[str]:
 
 def fallback_segment(packet: CombatEvidencePacket) -> CommentarySegment:
     primary = _primary_signal(packet)
-    lines = SAFE_LINES.get(_language_key(packet.language), SAFE_LINES["vi"])
+    lines = SAFE_LINES.get(canonical_language_code(packet.language), SAFE_LINES["vi"])
     text = lines.get(primary, lines["default"])
     start = max(0.0, packet.hook_time - packet.start_time - 0.25)
     return CommentarySegment(
@@ -380,35 +381,3 @@ def _keywords(text: str) -> list[str]:
 
 def _normalize(text: str) -> str:
     return text.lower()
-
-
-def _language_name(code: str) -> str:
-    return {
-        "vi": "Vietnamese",
-        "en": "American English",
-        "en-US": "American English",
-        "en-GB": "British English",
-        "zh": "Chinese",
-        "fr": "French",
-        "fr-FR": "French",
-        "de": "German",
-        "de-DE": "German",
-        "ja": "Japanese",
-        "ja-JP": "Japanese",
-        "ko": "Korean",
-        "ko-KR": "Korean",
-        "pt": "Brazilian Portuguese",
-        "pt-BR": "Brazilian Portuguese",
-        "es": "Spanish",
-    }.get(code, code or "Vietnamese")
-
-
-def _language_key(code: str) -> str:
-    return {
-        "en": "en-US",
-        "fr": "fr-FR",
-        "de": "de-DE",
-        "ja": "ja-JP",
-        "ko": "ko-KR",
-        "pt": "pt-BR",
-    }.get(code, code or "vi")

@@ -17,6 +17,7 @@ from src.ui.utils import Worker
 from src.remixer.orchestrator import RemixOrchestrator
 from src.core.types import VideoFolder, SegmentFile
 from src.analyzer.visual_analyzer import VisualAnalyzer
+from src.remixer.language_registry import language_code_from_label, language_label, supported_language_labels
 import os
 import asyncio
 from pathlib import Path
@@ -78,16 +79,7 @@ class RemixerPage(QWidget):
         lbl_lang = QLabel("Commentary Language:")
         lbl_lang.setStyleSheet("color: #94A3B8; margin-top: 10px;")
         self.cmb_lang = QComboBox()
-        self.cmb_lang.addItems([
-            "Viet Nam",
-            "Hoa Ky (My)",
-            "Vuong quoc Anh (Anh)",
-            "Phap",
-            "Duc",
-            "Nhat Ban",
-            "Han Quoc",
-            "Brazil",
-        ])
+        self.cmb_lang.addItems(supported_language_labels())
         self.cmb_lang.setCurrentText(self._get_language_full_name(self._config.voiceover.commentary.language))
         self.cmb_lang.setStyleSheet("padding: 5px; background: #0F172A; color: white; border: 1px solid #334155;")
         
@@ -307,36 +299,10 @@ class RemixerPage(QWidget):
         self.txt_script.append(f"\n❌ Lỗi: {error_tuple[1]}")
 
     def _get_language_full_name(self, code: str) -> str:
-        mapping = {
-            "vi": "Viet Nam",
-            "en": "Hoa Ky (My)",
-            "en-US": "Hoa Ky (My)",
-            "en-GB": "Vuong quoc Anh (Anh)",
-            "fr": "Phap",
-            "fr-FR": "Phap",
-            "de": "Duc",
-            "de-DE": "Duc",
-            "ja": "Nhat Ban",
-            "ja-JP": "Nhat Ban",
-            "ko": "Han Quoc",
-            "ko-KR": "Han Quoc",
-            "pt": "Brazil",
-            "pt-BR": "Brazil",
-        }
-        return mapping.get(code, "Viet Nam")
+        return language_label(code)
 
     def _get_language_code(self, name: str) -> str:
-        mapping = {
-            "Viet Nam": "vi",
-            "Hoa Ky (My)": "en-US",
-            "Vuong quoc Anh (Anh)": "en-GB",
-            "Phap": "fr-FR",
-            "Duc": "de-DE",
-            "Nhat Ban": "ja-JP",
-            "Han Quoc": "ko-KR",
-            "Brazil": "pt-BR",
-        }
-        return mapping.get(name, "vi")
+        return language_code_from_label(name)
 
     def _get_style_full_name(self, style_id: str) -> str:
         mapping = {"capcut_yellow": "CapCut Yellow", "modern_white": "Modern White", "glow_pink": "Glow Pink", "elegant_gold": "Elegant Gold", "neon_cyber": "Neon Cyber"}

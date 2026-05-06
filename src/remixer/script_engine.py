@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.core.logging import get_logger
 from src.core.types import RemixScript
 from src.llm.provider import LLMProvider
+from src.remixer.language_registry import language_prompt_name
 
 logger = get_logger(__name__)
 
@@ -20,7 +21,7 @@ class ScriptEngine:
         commentary_language: str = "vi",
     ) -> RemixScript:
         """Generate a remix script and force commentary into the selected language."""
-        language_name = _language_name(commentary_language)
+        language_name = language_prompt_name(commentary_language)
         prompt = f"""
 You are a viral short-form video creative director.
 Create a remix script for the topic: "{topic}".
@@ -63,24 +64,3 @@ Return valid JSON:
         except Exception as e:
             logger.error(f"AI script generation failed: {e}")
             raise
-
-
-def _language_name(code: str) -> str:
-    return {
-        "vi": "Vietnamese",
-        "en": "American English",
-        "en-US": "American English",
-        "en-GB": "British English",
-        "zh": "Chinese",
-        "fr": "French",
-        "fr-FR": "French",
-        "de": "German",
-        "de-DE": "German",
-        "ja": "Japanese",
-        "ja-JP": "Japanese",
-        "ko": "Korean",
-        "ko-KR": "Korean",
-        "pt": "Brazilian Portuguese",
-        "pt-BR": "Brazilian Portuguese",
-        "es": "Spanish",
-    }.get(code, code or "Vietnamese")
