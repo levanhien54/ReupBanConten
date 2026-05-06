@@ -356,6 +356,88 @@ def combat_search_api(index_id: Optional[str], query: Optional[str], limit: int)
         )
 
 
+@cli.command("combat-evaluate")
+@click.option("--input", "-i", "input_path", required=True, help="Video input path")
+@click.option("--transcript", "-t", "transcript_path", help="Transcript JSON cache path")
+@click.option("--output-dir", "-o", help="Directory containing exported combat clips")
+@click.option("--report", "report_path", help="JSON report path")
+@click.option("--top", default=10, show_default=True, help="Number of highlights to rank")
+@click.option("--transcript-only", is_flag=True, help="Only use transcript signals")
+@click.option("--use-api", is_flag=True, help="Merge Twelve Labs semantic matches into ranking")
+@click.option("--index-id", help="Twelve Labs index id/name for semantic combat search")
+@click.option("--api-query", help="Semantic query for combat highlights")
+@click.option("--api-limit", default=20, show_default=True, help="Maximum semantic API matches")
+def combat_evaluate(
+    input_path: str,
+    transcript_path: Optional[str],
+    output_dir: Optional[str],
+    report_path: Optional[str],
+    top: int,
+    transcript_only: bool,
+    use_api: bool,
+    index_id: Optional[str],
+    api_query: Optional[str],
+    api_limit: int,
+) -> None:
+    """Measure combat highlight ranking speed and exported clip validity."""
+    config = _bootstrap()
+    if not os.path.exists(input_path):
+        click.secho(f"Input file not found: {input_path}", fg="red")
+        return
+
+    from src.analyzer.combat_evaluator import CombatEvaluator, write_report
+    from src.analyzer.combat_sports import CombatSportsAnalyzer
+
+    resolved_video_id = _safe_video_id(input_path)
+    transcript = _load_transcript_for_combat_cut(
+        config=config,
+        input_path=input_path,
+        video_id=resolved_video_id,
+        transcript_path=transcript_path,
+        run_whisper=False,
+    )
+
+    api_results = []
+    if use_api:
+        analyzer = CombatSportsAnalyzer(config.combat_sports)
+        api_results = _search_combat_api(
+            analyzer=analyzer,
+            config=config,
+            index_id=index_id,
+            query=api_query,
+            limit=api_limit,
+        )
+
+    evaluator = CombatEvaluator(config)
+    report = evaluator.evaluate(
+        input_path=input_path,
+        transcript=transcript,
+        api_results=api_results,
+        output_dir=output_dir,
+        top_k=top,
+        transcript_only=transcript_only,
+    )
+
+    destination = report_path or os.path.join(config.storage.logs, f"{resolved_video_id}_combat_eval.json")
+    write_report(report, destination)
+    ranking = report["ranking"]
+    outputs = report["outputs"]
+    quality = report["quality_estimate"]
+    click.echo(f"Ranking time: {ranking['seconds']:.3f}s")
+    click.echo(f"Speed: {ranking['video_seconds_per_processing_second']} video seconds / processing second")
+    click.echo(f"Highlights: {ranking['highlight_count']} top_score={ranking['top_score']:.2f}")
+    click.echo(
+        f"Output clips: {outputs['valid_clip_count']}/{outputs['clip_count']} valid "
+        f"avg_duration={outputs['avg_clip_duration']:.2f}s"
+    )
+    click.echo(
+        f"Quality estimate: hook={quality['hook_strength_estimate']:.2f}/5 "
+        f"validity={quality['output_validity']:.2f}/5 "
+        f"duplicates={quality['duplicate_control_estimate']:.2f}/5"
+    )
+    click.secho(f"Report saved: {destination}", fg="green")
+
+
 @cli.command()
 @click.option("--video-id", "-v", required=True, help="ID video trong database")
 @click.option("--index", is_flag=True, default=True, help="Äáº©y video lĂªn Twelve Labs Index")

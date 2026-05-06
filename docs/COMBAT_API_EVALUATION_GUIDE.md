@@ -53,6 +53,18 @@ Measure-Command {
 }
 ```
 
+5. Generate an automated speed and validity report:
+
+```powershell
+python -m src.main combat-evaluate `
+  --input .\data\downloads\fight.mp4 `
+  --transcript .\data\transcripts\fight.json `
+  --output-dir .\data\clips\combat `
+  --report .\logs\fight_combat_eval.json `
+  --use-api `
+  --index-id YOUR_INDEX_ID
+```
+
 ## Speed Metrics
 
 Record these numbers for every test video:
@@ -63,6 +75,8 @@ Record these numbers for every test video:
 | API search time | `combat-search-api` wall clock | Under 10s after indexing |
 | Dry-run ranking time | `combat-cut --dry-run` wall clock | Faster than video duration |
 | Export time | `combat-cut --top 10` wall clock | Depends mostly on FFmpeg |
+| Ranking speed | `combat-evaluate` report | Faster than video duration |
+| Output validity | `combat-evaluate` report | 100% valid clips |
 | Clips per minute | exported clips / total minutes | Stable for same content type |
 
 Local transcript-only ranking is usually the fastest path. API search adds value
@@ -82,6 +96,11 @@ Review the top 10 exported clips and score each item from 1 to 5:
 | Output validity | No black frames, broken audio, or corrupt file | 5 |
 
 Average target: `4.0/5` or higher for selected clips.
+
+`combat-evaluate` automatically estimates hook strength from highlight scores,
+checks duplicate spacing, and validates exported files with `ffprobe`. Human
+review is still required for visual appeal because automated checks cannot fully
+judge whether the viewer will feel the moment is exciting.
 
 ## Interpreting Results
 
