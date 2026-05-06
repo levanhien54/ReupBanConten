@@ -114,6 +114,37 @@ Before writing commentary, every clip should expose this structured context:
 
 If a field is `null`, commentary cannot invent it.
 
+Current implementation now builds this input from:
+
+- `CombatHighlight.start_time`, `hook_time`, `end_time`,
+- all highlight signals such as `impact`, `motion`, `crowd_audio`,
+  `api_semantic`,
+- transcript segments overlapping the highlight window,
+- word timestamps overlapping the highlight window,
+- semantic API labels from `api_semantic` reasons,
+- known metadata when available.
+
+The key addition is `timeline`: every signal, transcript segment, and word is
+converted to clip-relative time. This lets commentary and subtitles target the
+same moment the viewer sees on screen.
+
+Example:
+
+```json
+{
+  "timeline": [
+    {"type": "transcript_segment", "time": 0.4, "end": 1.2, "text": "Big shot lands"},
+    {"type": "impact", "time": 0.8, "score": 0.9, "reason": "keyword:big shot"},
+    {"type": "motion", "time": 1.0, "score": 0.8, "reason": "motion_burst"}
+  ]
+}
+```
+
+Remaining gap: the generic Remix v2 script path still creates commentary from
+`RemixStep.commentary_text`. The combat-specific path should call
+`CombatCommentaryGenerator` directly from ranked highlights so voiceover text,
+subtitle timing, and visual hook time share the same evidence packet.
+
 ## Recommended Prompt Rules
 
 Use a strict system prompt for professional commentary:

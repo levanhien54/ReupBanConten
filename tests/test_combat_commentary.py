@@ -5,6 +5,7 @@ import pytest
 from src.core.types import CombatHighlight, CombatSignal, TranscriptResult, TranscriptSegment
 from src.remixer.combat_commentary import (
     CombatCommentaryGenerator,
+    build_timeline_evidence,
     build_evidence_packet,
     unsupported_claims,
 )
@@ -71,3 +72,22 @@ def test_unsupported_claims_allow_supported_knockdown_transcript():
     packet = build_evidence_packet(_highlight(), transcript=transcript)
 
     assert unsupported_claims("Đối thủ ngã xuống sau cú đòn rất nặng", packet) == []
+
+
+def test_timeline_evidence_maps_signals_and_words_relative_to_clip():
+    transcript = TranscriptResult(
+        full_text="",
+        segments=[
+            TranscriptSegment(start=4.6, end=5.4, text="Big shot lands"),
+        ],
+        word_timestamps=[
+            {"word": "Big", "start": 4.6, "end": 4.8, "probability": 0.9},
+            {"word": "shot", "start": 4.82, "end": 5.0, "probability": 0.9},
+        ],
+    )
+
+    timeline = build_timeline_evidence(_highlight(), transcript=transcript)
+
+    assert timeline[0]["type"] == "transcript_segment"
+    assert any(item["type"] == "impact" and item["time"] == 0.8 for item in timeline)
+    assert any(item["type"] == "word" and item["text"] == "shot" for item in timeline)

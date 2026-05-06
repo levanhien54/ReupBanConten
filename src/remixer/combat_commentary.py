@@ -46,6 +46,7 @@ class CombatEvidencePacket:
     reasons: list[str]
     transcript: str = ""
     visual_labels: list[str] = field(default_factory=list)
+    timeline: list[dict] = field(default_factory=list)
     known_facts: dict[str, Optional[str]] = field(default_factory=dict)
 
 
@@ -116,6 +117,7 @@ def build_evidence_packet(
 ) -> CombatEvidencePacket:
     signals = sorted({signal.kind for signal in highlight.signals})
     text = _transcript_near_highlight(transcript, highlight) if transcript else ""
+    timeline = build_timeline_evidence(highlight, transcript=transcript)
     visual_labels = []
     for signal in highlight.signals:
         if signal.kind == "api_semantic" and signal.reason:
@@ -130,8 +132,57 @@ def build_evidence_packet(
         reasons=highlight.reasons,
         transcript=text,
         visual_labels=visual_labels,
+        timeline=timeline,
         known_facts=known_facts or {},
     )
+
+
+def build_timeline_evidence(
+    highlight: CombatHighlight,
+    *,
+    transcript: Optional[TranscriptResult] = None,
+) -> list[dict]:
+    """Build relative timing evidence for commentary/subtitle alignment."""
+    events = []
+    clip_start = highlight.start_time
+    for signal in highlight.signals:
+        events.append(
+            {
+                "type": signal.kind,
+                "time": round(signal.time - clip_start, 3),
+                "abs_time": signal.time,
+                "score": signal.score,
+                "reason": signal.reason,
+            }
+        )
+
+    if transcript:
+        for segment in transcript.segments:
+            if segment.end < highlight.start_time or segment.start > highlight.end_time:
+                continue
+            events.append(
+                {
+                    "type": "transcript_segment",
+                    "time": round(max(segment.start, highlight.start_time) - clip_start, 3),
+                    "end": round(min(segment.end, highlight.end_time) - clip_start, 3),
+                    "text": segment.text,
+                }
+            )
+        for word in transcript.word_timestamps:
+            if word.end < highlight.start_time or word.start > highlight.end_time:
+                continue
+            events.append(
+                {
+                    "type": "word",
+                    "time": round(word.start - clip_start, 3),
+                    "end": round(word.end - clip_start, 3),
+                    "text": word.word,
+                    "probability": word.probability,
+                }
+            )
+
+    events.sort(key=lambda item: item.get("time", 0.0))
+    return events
 
 
 def build_commentary_prompt(packet: CombatEvidencePacket) -> str:
