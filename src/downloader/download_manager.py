@@ -26,6 +26,16 @@ from src.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def normalize_quality_selector(quality: str) -> str:
+    """Prefer split video/audio streams, then fall back to pre-merged formats."""
+    quality = (quality or "").strip()
+    match = re.fullmatch(r"best\[height<=([0-9]+)\]", quality)
+    if match:
+        height = match.group(1)
+        return f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"
+    return quality or "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
+
+
 # ── Error codes ───────────────────────────────────────────────
 
 class DownloadErrorCode(str, Enum):
@@ -220,6 +230,8 @@ class DownloadManager:
         output_dir: str,
         quality: str,
         progress_hook: Callable,
+        *,
+        include_subtitles: bool = True,
     ) -> dict:
         proxy_url: Optional[str] = None
         if self._config.proxy.enabled and self._config.proxy.url:
@@ -232,7 +244,7 @@ class DownloadManager:
         sub_langs_ext = sub_langs + [f"{l}.*" for l in sub_langs]
 
         opts: dict = {
-            "format": quality,
+            "format": normalize_quality_selector(quality),
             "outtmpl": os.path.join(output_dir, "%(id)s_%(title).60s.%(ext)s"),
             "quiet": True,
             "no_warnings": True,
@@ -256,6 +268,21 @@ class DownloadManager:
                 },
             ],
         }
+
+        if not include_subtitles:
+            for key in (
+                "writesubtitles",
+                "writeautomaticsub",
+                "subtitleslangs",
+                "subtitlesformat",
+                "embedsubtitles",
+            ):
+                opts.pop(key, None)
+            opts["postprocessors"] = [
+                pp
+                for pp in opts["postprocessors"]
+                if pp.get("key") != "FFmpegSubtitlesConvertor"
+            ]
 
         if proxy_url:
             opts["proxy"] = proxy_url
@@ -307,12 +334,48 @@ class DownloadManager:
 
         opts = self._build_ydl_opts(output_dir, quality, _hook)
 
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                progress.title = info.get("title", progress.title)
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    progress.title = info.get("title", progress.title)
+                    final_path = self._final_output_path(info)
+                    if final_path:
+                        output_path_holder.append(final_path)
+        except yt_dlp.utils.DownloadError as e:
+            if not self._is_subtitle_download_error(str(e)):
+                raise
+            logger.warning("Subtitle download failed; retrying video without subtitles: %s", e)
+            output_path_holder.clear()
+            retry_opts = self._build_ydl_opts(
+                output_dir,
+                quality,
+                _hook,
+                include_subtitles=False,
+            )
+            with yt_dlp.YoutubeDL(retry_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    progress.title = info.get("title", progress.title)
+                    final_path = self._final_output_path(info)
+                    if final_path:
+                        output_path_holder.append(final_path)
 
-        return output_path_holder[0] if output_path_holder else ""
+        return output_path_holder[-1] if output_path_holder else ""
+
+    @staticmethod
+    def _is_subtitle_download_error(error_msg: str) -> bool:
+        msg_lower = error_msg.lower()
+        return "subtitle" in msg_lower or "subtitles" in msg_lower
+
+    @staticmethod
+    def _final_output_path(info: dict) -> str:
+        requested_downloads = info.get("requested_downloads") or []
+        for item in reversed(requested_downloads):
+            path = item.get("filepath") or item.get("_filename")
+            if path:
+                return path
+        return info.get("filepath") or info.get("_filename") or ""
 
     @staticmethod
     def _classify_error(error_msg: str) -> tuple[DownloadErrorCode, str]:
