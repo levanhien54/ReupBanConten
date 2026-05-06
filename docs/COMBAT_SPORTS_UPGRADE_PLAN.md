@@ -83,6 +83,8 @@ Default exported highlight: 2.5-6.0s, with `0.8s` pre-action and `1.2s` post-act
 - Add remix strategy `combat-hooks`.
 - Script format: Hook -> Setup -> Payoff -> Replay/Reaction.
 - Add subtitles tuned for short, high-impact Vietnamese commentary.
+- Add fact-constrained commentary and subtitle rules from
+  `docs/COMBAT_COMMENTARY_SUBTITLE_REVIEW.md`.
 
 ### Sprint 4: Model Upgrade
 
@@ -100,4 +102,3 @@ Default exported highlight: 2.5-6.0s, with `0.8s` pre-action and `1.2s` post-act
 | Best-moment precision | > 80% on manually labeled fights |
 | Duplicate highlights | < 10% |
 | Average hook start delay | < 1.0s from clip start |
-
