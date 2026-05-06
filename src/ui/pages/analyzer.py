@@ -43,6 +43,13 @@ class AnalyzerPage(QWidget):
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(
+            self._build_role_note(
+                "Purpose: prepare and inspect assets. Use this tab for Whisper transcripts, "
+                "LLM/visual analysis, and Twelve Labs indexing before clips are reused by "
+                "Combat Studio or Remixer."
+            )
+        )
         
         # ── Folder Selection ──
         grp_folder = QGroupBox("📁 Nguồn Dữ Liệu")
@@ -133,6 +140,15 @@ class AnalyzerPage(QWidget):
         layout.addWidget(splitter)
         
         self._load_videos()
+
+    def _build_role_note(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet(
+            "background:#0F172A;color:#CBD5E1;border:1px solid #334155;"
+            "border-radius:6px;padding:8px;font-size:12px;"
+        )
+        return label
 
     def _choose_folder(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Chọn thư mục chứa Clips / Video")

@@ -60,6 +60,13 @@ class CombatStudioPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
+        layout.addWidget(
+            self._build_role_note(
+                "Purpose: one fight video -> combat hooks -> 9:16 clips -> "
+                "commentary, subtitles, voiceover, final MP4. Use Analyzer only "
+                "when you want reusable transcript/index prep before running this pipeline."
+            )
+        )
         layout.addWidget(self._build_inputs())
         layout.addWidget(self._build_options())
 
@@ -93,6 +100,15 @@ class CombatStudioPage(QWidget):
         layout.addStretch(1)
 
         root.addWidget(scroll)
+
+    def _build_role_note(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet(
+            "background:#0F172A;color:#CBD5E1;border:1px solid #334155;"
+            "border-radius:6px;padding:8px;font-size:12px;"
+        )
+        return label
 
     def _build_inputs(self) -> QGroupBox:
         group = QGroupBox("Combat Source")
@@ -145,8 +161,8 @@ class CombatStudioPage(QWidget):
 
         self.chk_commentary = QCheckBox("Write commentary, subtitles, voiceover, final MP4")
         self.chk_commentary.setChecked(True)
-        self.chk_whisper = QCheckBox("Run Whisper if transcript is missing")
-        self.chk_api = QCheckBox("Use semantic API when configured")
+        self.chk_whisper = QCheckBox("Auto-transcribe if transcript is missing")
+        self.chk_api = QCheckBox("Use indexed semantic matches when configured")
         self.chk_transcript_only = QCheckBox("Transcript-only analysis")
 
         form.addRow("Top clips:", self.spn_top)

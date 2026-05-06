@@ -35,6 +35,12 @@ class RemixerPage(QWidget):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(
+            self._build_role_note(
+                "Purpose: assemble a new video from the prepared clip library. "
+                "Use this after Scanner/Cutter/Analyzer or Combat Studio has produced reusable clips."
+            )
+        )
         
         # Splitter chính
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -147,6 +153,15 @@ class RemixerPage(QWidget):
         layout.addWidget(splitter)
         
         self._load_mock_folders()
+
+    def _build_role_note(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet(
+            "background:#0F172A;color:#CBD5E1;border:1px solid #334155;"
+            "border-radius:6px;padding:8px;font-size:12px;"
+        )
+        return label
 
     def _build_subtitle_editor_group(self) -> QGroupBox:
         group = QGroupBox("Subtitle Editor")
